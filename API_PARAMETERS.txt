@@ -1,0 +1,537 @@
+================================================================================
+CITY PULSE - API ENDPOINTS DOCUMENTATION
+================================================================================
+Base URL: /api
+
+================================================================================
+ENDPOINTS AND METHODS
+================================================================================
+Summary of all API endpoints and HTTP methods (see sections below for parameters
+and response details).
+
+  Root
+    GET   /
+
+  Auth
+    POST  /api/auth/login
+    GET   /api/auth/me          (Bearer token required)
+
+  Users
+    GET   /api/users
+    GET   /api/users/{id}
+    POST  /api/users
+    PUT   /api/users/{id}
+    DELETE /api/users/{id}
+
+  Regions
+    GET   /api/regions
+    GET   /api/regions/{region_id_or_name}/events
+    GET   /api/regions/{region_id_or_name}/users
+
+  Events
+    GET   /api/events
+    GET   /api/events/{id}
+    POST  /api/events
+    PUT   /api/events/{id}
+    DELETE /api/events/{id}
+
+  Trends
+    GET   /api/trends
+    POST  /api/trends
+    PUT   /api/trends
+
+  Interactions
+    GET   /api/interactions
+    PUT   /api/interactions/events/{event_id}/likes
+    DELETE /api/interactions/events/{event_id}/likes
+    PUT   /api/interactions/events/{event_id}/comments
+    DELETE /api/interactions/events/{event_id}/comments/{comment_id}
+    PUT   /api/interactions/events/{event_id}/attending
+    DELETE /api/interactions/events/{event_id}/attending
+
+================================================================================
+PART 3: DATA MODELS
+================================================================================
+City Pulse uses the following data models. Attributes and relationships are
+listed for each entity (one-to-one and one-to-many in terms of the owning side).
+
+--------------------------------------------------------------------------------
+User:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, not autoincrement (assigned in app: 0, 1, 2, ...)
+    - name: varchar(255), required
+    - email: varchar(255), required, unique
+    - password_hash: varchar(255), required
+    - created_at: timestamp (timezone), required, server default
+    - region_id: int, optional, foreign key → regions.id (city location)
+
+  Relationships:
+    - Many-to-one: User belongs to one Region (user's city location).
+    - One-to-many: User creates many Events (events posted by this user).
+    - One-to-many: User has many EventLikes (likes the user has given).
+    - One-to-many: User has many EventComments (comments the user has written).
+    - One-to-many: User has many EventAttending (events the user is attending).
+
+--------------------------------------------------------------------------------
+Region:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, not autoincrement (e.g. 0 = San Diego)
+    - name: varchar(255), required, unique
+
+  Relationships:
+    - One-to-many: Region has many Users (users whose city_location is this region).
+    - One-to-many: Region has many Events (events that take place in this region).
+    - One-to-many: Region has many Trends (cached trend list entries for this region).
+
+--------------------------------------------------------------------------------
+Event:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, autoincrement
+    - region_id: int, required, foreign key → regions.id
+    - user_id: int, optional, foreign key → users.id (poster; SET NULL on delete)
+    - title: varchar(512), required
+    - content: text, optional
+    - created_at: timestamp (timezone), required, server default
+
+  Relationships:
+    - Many-to-one: Event belongs to one Region (event's location).
+    - Many-to-one: Event belongs to one User (poster; optional).
+    - One-to-many: Event has many EventLikes (users who liked this event).
+    - One-to-many: Event has many EventComments (comments on this event).
+    - One-to-many: Event has many EventAttending (users attending this event).
+    - One-to-many: Event has many Trend entries (can appear in a region's trend list).
+
+--------------------------------------------------------------------------------
+EventLike:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, autoincrement
+    - user_id: int, required, foreign key → users.id (CASCADE on delete)
+    - event_id: int, required, foreign key → events.id (CASCADE on delete)
+    - Unique constraint: (user_id, event_id) — one like per user per event
+
+  Relationships:
+    - Many-to-one: EventLike belongs to one User (the user who liked).
+    - Many-to-one: EventLike belongs to one Event (the event liked).
+
+--------------------------------------------------------------------------------
+EventComment:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, autoincrement
+    - user_id: int, required, foreign key → users.id (CASCADE on delete)
+    - event_id: int, required, foreign key → events.id (CASCADE on delete)
+    - text: text, required
+    - created_at: timestamp (timezone), required, server default
+
+  Relationships:
+    - Many-to-one: EventComment belongs to one User (the comment author).
+    - Many-to-one: EventComment belongs to one Event (the event commented on).
+
+--------------------------------------------------------------------------------
+EventAttending:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, autoincrement
+    - user_id: int, required, foreign key → users.id (CASCADE on delete)
+    - event_id: int, required, foreign key → events.id (CASCADE on delete)
+    - Unique constraint: (user_id, event_id) — one attendance record per user per event
+
+  Relationships:
+    - Many-to-one: EventAttending belongs to one User (the user attending).
+    - Many-to-one: EventAttending belongs to one Event (the event they are attending).
+
+--------------------------------------------------------------------------------
+Trend:
+--------------------------------------------------------------------------------
+  Attributes/Fields:
+    - id: int, primary key, autoincrement
+    - region_id: int, required, foreign key → regions.id (CASCADE on delete)
+    - event_id: int, required, foreign key → events.id (CASCADE on delete)
+    - rank: int, required (1 = most popular; order: attendance, then comments, then likes)
+    - attendance_count: int, required, default 0 (snapshot when list was built/updated)
+    - comments_count: int, required, default 0
+    - likes_count: int, required, default 0
+    - updated_at: timestamp (timezone), required, server default
+    - Unique constraint: (region_id, event_id) — each event appears at most once per region's trend list
+
+  Relationships:
+    - Many-to-one: Trend belongs to one Region (the region this trend list is for).
+    - Many-to-one: Trend belongs to one Event (the event in the trend list).
+
+================================================================================
+PART 4: DATABASE SCHEMA
+================================================================================
+Based on the defined models, the database schema is outlined below. Tables and
+their relationships are described. PK = Primary Key; UK = Unique Key; FK = Foreign Key.
+
+--------------------------------------------------------------------------------
+regions Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, name (UK)
+
+  Relationships:
+    PK: id
+    1-to-many: regions.id → users.region_id
+    1-to-many: regions.id → events.region_id
+    1-to-many: regions.id → trends.region_id
+
+--------------------------------------------------------------------------------
+users Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, name, email (UK), password_hash, created_at, region_id
+
+  Relationships:
+    PK: id
+    Foreign Key: region_id references regions(id)
+    1-to-many: users.id → events.user_id
+    1-to-many: users.id → event_likes.user_id
+    1-to-many: users.id → event_comments.user_id
+    1-to-many: users.id → event_attending.user_id
+
+--------------------------------------------------------------------------------
+events Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, region_id, user_id, title, content, created_at
+
+  Relationships:
+    PK: id
+    Foreign Key: region_id references regions(id)
+    Foreign Key: user_id references users(id) [optional; SET NULL on delete]
+    1-to-many: events.id → event_likes.event_id
+    1-to-many: events.id → event_comments.event_id
+    1-to-many: events.id → event_attending.event_id
+    1-to-many: events.id → trends.event_id
+
+--------------------------------------------------------------------------------
+event_likes Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, user_id, event_id
+    Unique constraint: (user_id, event_id) — one like per user per event
+
+  Relationships:
+    PK: id
+    Foreign Key: user_id references users(id) [CASCADE on delete]
+    Foreign Key: event_id references events(id) [CASCADE on delete]
+    Many-to-one: event_likes.user_id → users.id
+    Many-to-one: event_likes.event_id → events.id
+
+--------------------------------------------------------------------------------
+event_comments Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, user_id, event_id, text, created_at
+
+  Relationships:
+    PK: id
+    Foreign Key: user_id references users(id) [CASCADE on delete]
+    Foreign Key: event_id references events(id) [CASCADE on delete]
+    Many-to-one: event_comments.user_id → users.id
+    Many-to-one: event_comments.event_id → events.id
+
+--------------------------------------------------------------------------------
+event_attending Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, user_id, event_id
+    Unique constraint: (user_id, event_id) — one attendance per user per event
+
+  Relationships:
+    PK: id
+    Foreign Key: user_id references users(id) [CASCADE on delete]
+    Foreign Key: event_id references events(id) [CASCADE on delete]
+    Many-to-one: event_attending.user_id → users.id
+    Many-to-one: event_attending.event_id → events.id
+
+--------------------------------------------------------------------------------
+trends Table
+--------------------------------------------------------------------------------
+  Columns:
+    id, region_id, event_id, rank, attendance_count, comments_count, likes_count, updated_at
+    Unique constraint: (region_id, event_id) — each event at most once per region's trend list
+
+  Relationships:
+    PK: id
+    Foreign Key: region_id references regions(id) [CASCADE on delete]
+    Foreign Key: event_id references events(id) [CASCADE on delete]
+    Many-to-one: trends.region_id → regions.id
+    Many-to-one: trends.event_id → events.id
+
+--------------------------------------------------------------------------------
+Note: PK (Primary Key)
+--------------------------------------------------------------------------------
+  PK identifies the primary key of a table: the column (or set of columns) that
+  uniquely identifies each row. Primary keys must be unique and cannot be NULL.
+  In City Pulse, most tables use a single column "id" as the primary key.
+
+================================================================================
+USERS
+================================================================================
+
+1. GET /api/users
+   Method:     GET
+   Purpose:    Get a list of users.
+   Parameters:
+     - skip (optional, query): Pagination offset. Default: 0
+     - limit (optional, query): Max results. Default: 50
+
+   SUCCESS Response (200):
+   [
+     { "id": 1, "name": "John", "email": "john@example.com" },
+     { "id": 2, "name": "Jane", "email": "jane@example.com" }
+   ]
+
+   ERROR Response (422): Validation error
+   { "detail": [ { "loc": [...], "msg": "...", "type": "..." } ] }
+
+   ERROR Response (409): Email already registered
+   { "detail": "Email already registered" }
+
+--------------------------------------------------------------------------------
+
+2. GET /api/users/{id}
+   Method:     GET
+   Purpose:    Get a single user by ID.
+   Parameters:
+     - id (required, path): User ID
+
+   SUCCESS Response (200):
+   { "id": 1, "name": "John", "email": "john@example.com" }
+
+   ERROR Response (404): User not found
+   { "detail": "User not found" }
+
+--------------------------------------------------------------------------------
+
+3. POST /api/users
+   Method:     POST
+   Purpose:    Create a new user.
+   Parameters (JSON body):
+     - name  (optional): Display name
+     - email (optional): Email address
+     - password (required): User password (stored hashed)
+
+   SUCCESS Response (201):
+   { "id": 1, "name": "John", "email": "john@example.com" }
+
+   ERROR Response (422): Validation error
+   { "detail": [ { "loc": [...], "msg": "...", "type": "..." } ] }
+
+--------------------------------------------------------------------------------
+
+4. PUT /api/users/{id}
+   Method:     PUT
+   Purpose:    Update user information (name, email).
+   Parameters:
+     - id (required, path): User ID
+     - name  (optional, JSON body): New display name
+     - email (optional, JSON body): New email
+
+   SUCCESS Response (200):
+   { "success": true }
+
+   ERROR Response (404): User not found
+   { "detail": "User not found" }
+
+   ERROR Response (409): Email already in use
+   { "detail": "Email already in use" }
+
+--------------------------------------------------------------------------------
+
+5. DELETE /api/users/{id}
+   Method:     DELETE
+   Purpose:    Delete a user.
+   Parameters:
+     - id (required, path): User ID
+
+   SUCCESS Response (200):
+   { "success": true }
+
+   ERROR Response (404): User not found
+   { "detail": "User not found" }
+
+================================================================================
+EVENTS
+================================================================================
+
+6. GET /api/events
+   Method:     GET
+   Purpose:    Get a list of events.
+   Parameters:
+     - skip      (optional, query): Pagination offset. Default: 0
+     - limit     (optional, query): Max results. Default: 50
+     - region_id (optional, query): Filter by region ID
+     - category  (optional, query): Filter by category
+
+   SUCCESS Response (200):
+   [
+     {
+       "id": 1,
+       "region_id": 1,
+       "timestamp": "2025-02-16T12:00:00Z",
+       "category": "general",
+       "sentiment_score": null,
+       "source_url": null,
+       "raw_data": null,
+       "title": "Event Name",
+       "summary": null
+     }
+   ]
+
+   ERROR Response (422): Validation error
+   { "detail": [ { "loc": [...], "msg": "...", "type": "..." } ] }
+
+--------------------------------------------------------------------------------
+
+7. GET /api/events/{id}
+   Method:     GET
+   Purpose:    Get a single event by ID.
+   Parameters:
+     - id (required, path): Event ID
+
+   SUCCESS Response (200):
+   {
+     "id": 1,
+     "region_id": 1,
+     "timestamp": "2025-02-16T12:00:00Z",
+     "category": "general",
+     "sentiment_score": null,
+     "source_url": null,
+     "raw_data": null,
+     "title": "Event Name",
+     "summary": null
+   }
+
+   ERROR Response (404): Event not found
+   { "detail": "Event not found" }
+
+--------------------------------------------------------------------------------
+
+8. POST /api/events
+   Method:     POST
+   Purpose:    Create a new event.
+   Parameters (JSON body):
+     - name      (required): Event name
+     - region_id (required): Region ID (must exist)
+
+   SUCCESS Response (201):
+   {
+     "id": 1,
+     "region_id": 1,
+     "timestamp": "2025-02-16T12:00:00Z",
+     "category": "general",
+     "sentiment_score": null,
+     "source_url": null,
+     "raw_data": null,
+     "title": "Event Name",
+     "summary": null
+   }
+
+   ERROR Response (400): Region not found
+   { "detail": "Region not found" }
+
+   ERROR Response (422): Validation error
+   { "detail": [ { "loc": [...], "msg": "...", "type": "..." } ] }
+
+--------------------------------------------------------------------------------
+
+9. DELETE /api/events/{id}
+   Method:     DELETE
+   Purpose:    Delete an event.
+   Parameters:
+     - id (required, path): Event ID
+
+   SUCCESS Response (200):
+   { "success": true }
+
+   ERROR Response (404): Event not found
+   { "detail": "Event not found" }
+
+================================================================================
+SUMMARY - REQUIRED & OPTIONAL PARAMETERS
+================================================================================
+
+USER ENDPOINTS:
+  GET /api/users
+    Optional: skip, limit
+  GET /api/users/{id}
+    Required: id (path)
+  POST /api/users
+    Required: password (body)
+    Optional: name, email (body)
+  PUT /api/users/{id}
+    Required: id (path)
+    Optional: name, email (body)
+  DELETE /api/users/{id}
+    Required: id (path)
+
+EVENT ENDPOINTS:
+  GET /api/events
+    Optional: skip, limit, region_id, category
+  GET /api/events/{id}
+    Required: id (path)
+  POST /api/events
+    Required: name, region_id (body)
+  DELETE /api/events/{id}
+    Required: id (path)
+
+================================================================================
+TRENDS (read-only for users; system maintains list)
+================================================================================
+  GET /api/trends
+    Optional: region (query, default "san diego"), skip, limit
+    Returns: List of most interacted events in region, ordered by rank.
+    Priority: 1st attendance, 2nd comments, 3rd likes.
+    Each item: event_id, rank, title, attendance_count, comments_count, likes_count, updated_at.
+
+  POST /api/trends
+    Body: { "region": "san diego" | 0 } (optional)
+    Rebuilds the trend list for the region from current interaction counts.
+
+  PUT /api/trends
+    Body: { "region": "san diego" | 0, "event_id": int, "rank": int | null (optional) }
+    Adds or updates an event in the trend list and reorders by interactions.
+
+================================================================================
+INTERACTIONS
+================================================================================
+  GET /api/interactions
+    Optional: region (query), skip, limit
+    Returns: List of events in region with likes_count, comments_count, attendance_count, comments[].
+
+  PUT /api/interactions/events/{event_id}/likes
+    Body: { "user_id": int }
+    Adds a like from the user to the event.
+
+  PUT /api/interactions/events/{event_id}/comments
+    Body: { "user_id": int, "text": str }
+    Adds a comment from the user to the event. Returns the created comment (201).
+
+  PUT /api/interactions/events/{event_id}/attending
+    Body: { "user_id": int }
+    Marks the user as attending the event.
+
+  DELETE /api/interactions/events/{event_id}/likes?user_id={user_id}
+    Removes the user's like from the event.
+
+  DELETE /api/interactions/events/{event_id}/comments/{comment_id}?user_id={user_id}
+    Removes the user's comment (user must own the comment).
+
+  DELETE /api/interactions/events/{event_id}/attending?user_id={user_id}
+    Removes the user's attendance.
+
+================================================================================
+GENERAL ERROR RESPONSE FORMAT
+================================================================================
+  HTTP 404: { "detail": "Resource not found" }
+  HTTP 409: { "detail": "Email already registered" } (users) or "Email already in use" (update)
+  HTTP 422: { "detail": [ { "loc": ["body","field"], "msg": "error message", "type": "value_error" } ] }
+  HTTP 400: { "detail": "Error description" }
+  HTTP 500: { "detail": "Internal server error", "success": false }
