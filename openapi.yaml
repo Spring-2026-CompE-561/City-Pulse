@@ -1,0 +1,1159 @@
+openapi: 3.0.3
+info:
+  title: City Pulse API
+  version: 0.1.0
+  description: >
+    REST API for City Pulse — users (city location = San Diego only), regions,
+    events, trends (most interacted events by region), and interactions (likes, comments, attending).
+    Authenticate via POST /api/auth/login and use the returned access_token as Bearer token for GET /api/auth/me.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+paths:
+  /:
+    get:
+      summary: Service info and endpoint list
+      tags: [Root]
+      responses:
+        "200":
+          description: Service name, docs URL, and list of API prefixes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: "City Pulse"
+                  docs:
+                    type: string
+                    example: "/docs"
+                  openapi:
+                    type: string
+                    example: "/openapi.json"
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+                    example: ["/api/auth", "/api/users", "/api/regions", "/api/events", "/api/trends", "/api/interactions"]
+
+  # ---------------------------------------------------------------------------
+  # Auth
+  # ---------------------------------------------------------------------------
+  /api/auth/login:
+    post:
+      summary: Login and get Bearer token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Success; use access_token as Bearer for protected endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: "bearer"
+        "401":
+          description: Incorrect email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /api/auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRead"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ---------------------------------------------------------------------------
+  # Users
+  # ---------------------------------------------------------------------------
+  /api/users:
+    get:
+      summary: List users
+      tags: [Users]
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Users and count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    post:
+      summary: Create a new user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRead"
+        "400":
+          description: Invalid city_location (only 'san diego' supported)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /api/users/{id}:
+    get:
+      summary: Get user by ID
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRead"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+    put:
+      summary: Update user (name, email, city_location)
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Update success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Incorrect password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    delete:
+      summary: Delete user by ID
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deletion success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ---------------------------------------------------------------------------
+  # Regions
+  # ---------------------------------------------------------------------------
+  /api/regions:
+    get:
+      summary: List all regions
+      tags: [Regions]
+      responses:
+        "200":
+          description: List of regions (e.g. San Diego)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RegionRead"
+
+  /api/regions/{region_id_or_name}/events:
+    get:
+      summary: List events in a region
+      tags: [Regions]
+      parameters:
+        - name: region_id_or_name
+          in: path
+          required: true
+          description: Region ID (0) or name ('san diego', 'san-diego')
+          schema:
+            oneOf:
+              - type: integer
+                example: 0
+              - type: string
+                example: "san diego"
+      responses:
+        "200":
+          description: Events in the region
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventRead"
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /api/regions/{region_id_or_name}/users:
+    get:
+      summary: List users in a region
+      tags: [Regions]
+      parameters:
+        - name: region_id_or_name
+          in: path
+          required: true
+          description: Region ID (0) or name ('san diego', 'san-diego')
+          schema:
+            oneOf:
+              - type: integer
+              - type: string
+      responses:
+        "200":
+          description: Users in the region
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserRead"
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ---------------------------------------------------------------------------
+  # Events
+  # ---------------------------------------------------------------------------
+  /api/events:
+    get:
+      summary: List events (optional region filter)
+      tags: [Events]
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+            default: "san diego"
+          description: 'san diego or 0'
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventRead"
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    post:
+      summary: Create a new event (in user's region; user must be San Diego)
+      tags: [Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCreate"
+      responses:
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRead"
+        "400":
+          description: User must have city_location san diego / Region not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /api/events/{id}:
+    get:
+      summary: Get event by ID
+      tags: [Events]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRead"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+    put:
+      summary: Update event title and/or content
+      tags: [Events]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventUpdate"
+      responses:
+        "200":
+          description: Update success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    delete:
+      summary: Delete event by ID
+      tags: [Events]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deletion success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  # ---------------------------------------------------------------------------
+  # Trends (read-only for users; system maintains list)
+  # ---------------------------------------------------------------------------
+  /api/trends:
+    get:
+      summary: Get most interacted events in a region (by rank: attendance, comments, likes)
+      tags: [Trends]
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+            default: "san diego"
+          description: 'san diego or 0'
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: List of trend entries (event_id, rank, title, counts, updated_at)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendEntryRead"
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+    post:
+      summary: Rebuild trend list for a region from current interaction counts
+      tags: [Trends]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrendRebuildBody"
+      responses:
+        "201":
+          description: Trend list rebuilt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    put:
+      summary: Add or update an event in the trend list and reorder by interactions
+      tags: [Trends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrendUpdateBody"
+      responses:
+        "200":
+          description: Update success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Event not found in this region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  # ---------------------------------------------------------------------------
+  # Interactions
+  # ---------------------------------------------------------------------------
+  /api/interactions:
+    get:
+      summary: List events in a region with interaction counts and comments
+      tags: [Interactions]
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+            default: "san diego"
+          description: 'san diego or 0'
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Events with likes_count, comments_count, attendance_count, comments[]
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventWithInteractionsRead"
+        "400":
+          description: Unknown region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /api/interactions/events/{event_id}/likes:
+    put:
+      summary: Add a like from a user to an event (idempotent)
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InteractionLikeBody"
+      responses:
+        "200":
+          description: Success (or already liked)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    delete:
+      summary: Remove a user's like from an event
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Like removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Like not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /api/interactions/events/{event_id}/comments:
+    put:
+      summary: Add a comment from a user to an event
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InteractionCommentBody"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentRead"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+  /api/interactions/events/{event_id}/comments/{comment_id}:
+    delete:
+      summary: Remove a user's comment (user must own the comment)
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comment removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "403":
+          description: Cannot delete another user's comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "404":
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+  /api/interactions/events/{event_id}/attending:
+    put:
+      summary: Mark user as attending an event (idempotent)
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InteractionAttendingBody"
+      responses:
+        "200":
+          description: Success (or already attending)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    delete:
+      summary: Remove a user's attendance from an event
+      tags: [Interactions]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Attendance removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Attendance record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+
+components:
+  schemas:
+    ErrorDetail:
+      type: object
+      description: Standard error body
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                properties:
+                  loc:
+                    type: array
+                    items: {}
+                  msg:
+                    type: string
+                  type:
+                    type: string
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+              msg:
+                type: string
+              type:
+                type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email (same as when account was created)
+        password:
+          type: string
+          description: Current password
+
+    UserRead:
+      type: object
+      description: User profile (API response)
+      properties:
+        id:
+          type: integer
+          example: 0
+        name:
+          type: string
+          example: "John"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        city_location:
+          type: string
+          nullable: true
+          example: "san diego"
+        created_at:
+          type: string
+          format: date-time
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserRead"
+        count:
+          type: integer
+
+    UserCreate:
+      type: object
+      required: [password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          minLength: 1
+          maxLength: 255
+        password:
+          type: string
+          minLength: 1
+        city_location:
+          type: string
+          description: Only 'san diego' is supported
+
+    UserUpdate:
+      type: object
+      required: [current_password]
+      properties:
+        current_password:
+          type: string
+          description: Password to verify identity
+        name:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 255
+        city_location:
+          type: string
+          nullable: true
+          description: Only 'san diego' is supported
+
+    RegionRead:
+      type: object
+      description: Region (filing cabinet for events and users)
+      properties:
+        id:
+          type: integer
+          example: 0
+        name:
+          type: string
+          example: "San Diego"
+
+    EventRead:
+      type: object
+      description: Event in a region
+      properties:
+        id:
+          type: integer
+        region_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        content:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    EventCreate:
+      type: object
+      required: [user_id, title]
+      properties:
+        user_id:
+          type: integer
+          description: User posting (must have city_location = san diego)
+        title:
+          type: string
+          minLength: 1
+          maxLength: 512
+        content:
+          type: string
+          nullable: true
+          maxLength: 10000
+
+    EventUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 512
+        content:
+          type: string
+          nullable: true
+
+    TrendEntryRead:
+      type: object
+      description: Single trend entry (event + rank and interaction counts)
+      properties:
+        event_id:
+          type: integer
+        rank:
+          type: integer
+        title:
+          type: string
+        attendance_count:
+          type: integer
+        comments_count:
+          type: integer
+        likes_count:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+
+    TrendRebuildBody:
+      type: object
+      properties:
+        region:
+          type: string
+          description: 'san diego or 0'
+          default: "san diego"
+
+    TrendUpdateBody:
+      type: object
+      required: [event_id]
+      properties:
+        region:
+          type: string
+          default: "san diego"
+        event_id:
+          type: integer
+          description: Event to add or update in trends
+        rank:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: New rank (1-based); omit to reorder by stats
+
+    EventWithInteractionsRead:
+      type: object
+      description: Event with interaction counts and comments list
+      properties:
+        id:
+          type: integer
+        region_id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        content:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        likes_count:
+          type: integer
+          default: 0
+        comments_count:
+          type: integer
+          default: 0
+        attendance_count:
+          type: integer
+          default: 0
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentRead"
+
+    CommentRead:
+      type: object
+      description: Single comment on an event
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        event_id:
+          type: integer
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    InteractionLikeBody:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+          description: User who is liking the event
+
+    InteractionCommentBody:
+      type: object
+      required: [user_id, text]
+      properties:
+        user_id:
+          type: integer
+          description: User who is commenting
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+
+    InteractionAttendingBody:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+          description: User who is attending
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Use access_token from POST /api/auth/login
