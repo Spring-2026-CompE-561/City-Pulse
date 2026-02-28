@@ -10,7 +10,7 @@ Location-based trend aggregation web application. Informs users about significan
 |-------------|------------|
 | API         | [FastAPI](https://fastapi.tiangolo.com/) |
 | Server      | [Uvicorn](https://www.uvicorn.org/) |
-| ORM / DB    | [SQLAlchemy](https://docs.sqlalchemy.org/) 2.x (async) + [aiosqlite](https://aiosqlite.readthedocs.io/) |
+| ORM / DB    | [SQLAlchemy](https://docs.sqlalchemy.org/) 2.x (async) + [asyncmy](https://github.com/long2ice/asyncmy) (MySQL). Optional: [aiosqlite](https://aiosqlite.readthedocs.io/) for SQLite. |
 | Validation   | [Pydantic](https://docs.pydantic.dev/) + [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
 | Code quality | [Ruff](https://docs.astral.sh/ruff/), [Black](https://black.readthedocs.io/), [pre-commit](https://pre-commit.com/) |
 
@@ -48,7 +48,8 @@ City-Pulse/
 ### `py-project.toml`
 
 - **Project metadata**: name, version, description, Python ≥3.11.
-- **Dependencies**: FastAPI, Uvicorn, SQLAlchemy, Pydantic, Pydantic-Settings, aiosqlite.
+- **Dependencies**: FastAPI, Uvicorn, SQLAlchemy, Pydantic, Pydantic-Settings, asyncmy (MySQL).
+- **Optional**: `pip install -e ".[sqlite]"` for SQLite support (aiosqlite).
 - **Optional dev**: pytest, pytest-asyncio, httpx, ruff, black, pre-commit.
 - **Build**: Hatch; package lives in `src/app`.
 - **Tools**: Ruff and Black config (line length, target version), pytest asyncio and test path.
@@ -70,9 +71,10 @@ Runs before each commit:
 
 ### `src/app/config.py`
 
-- Loads settings from environment or a `.env` file.
-- Defines `debug` and `database_url` (default: SQLite with aiosqlite).
-- Single `settings` instance used across the app.
+- Loads settings from environment or a `.env` file (see `.env.example`).
+- **MySQL (default)**: builds `database_url` from `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` if `DATABASE_URL` is not set.
+- Or set `DATABASE_URL` to a full URL (e.g. `mysql+asyncmy://...` or `sqlite+aiosqlite:///./city_pulse.db`).
+- Defines `debug` and token expiry. Single `settings` instance used across the app.
 
 **Resources:** [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 
@@ -80,9 +82,9 @@ Runs before each commit:
 
 ### `src/app/database.py`
 
-- **Engine**: async SQLAlchemy engine from `config.database_url`.
+- **Engine**: async SQLAlchemy engine from `config.database_url` (MySQL by default). Uses connection pooling (`pool_size`, `max_overflow`, `pool_pre_ping`) for concurrent users.
 - **Session**: async session factory and `get_db()` dependency for request-scoped sessions (commit/rollback/close).
-- **init_db()**: creates all tables (called on app startup in `main.py`).
+- **init_db()**: creates all tables and seeds the San Diego region (called on app startup in `main.py`). Supports both MySQL and SQLite (SQLite-only migrations run only when using SQLite).
 
 **Resources:** [SQLAlchemy asyncio](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) · [AsyncSession](https://docs.sqlalchemy.org/en/20/orm/session_api.html#sqlalchemy.ext.asyncio.AsyncSession)
 
@@ -157,8 +159,10 @@ Pydantic models for API:
    If your project file is `py-project.toml` and your tool expects `pyproject.toml`, either rename it or install with:
 
    ```bash
-   pip install fastapi "uvicorn[standard]" sqlalchemy pydantic pydantic-settings aiosqlite
+   pip install fastapi "uvicorn[standard]" sqlalchemy pydantic pydantic-settings asyncmy
    ```
+
+   For SQLite instead of MySQL: `pip install -e ".[sqlite]"` (or add `aiosqlite` and set `DATABASE_URL=sqlite+aiosqlite:///./city_pulse.db`).
 
 3. **Run the API** (from repo root, with `src` on `PYTHONPATH`):
 
@@ -188,10 +192,20 @@ After that, Ruff and Black run automatically on commit.
 
 ## Environment
 
-| Variable        | Default                          | Description                |
-|----------------|-----------------------------------|----------------------------|
+Copy `.env.example` to `.env` and set values. Used for MySQL (and optional overrides).
+
+| Variable        | Default / built value             | Description |
+|----------------|-----------------------------------|-------------|
+| `MYSQL_HOST`   | `localhost`                       | MySQL host. |
+| `MYSQL_PORT`   | `3306`                            | MySQL port. |
+| `MYSQL_USER`   | `city_pulse`                      | MySQL user. |
+| `MYSQL_PASSWORD` | *(empty)*                       | MySQL password. Set in `.env`. |
+| `MYSQL_DATABASE` | `city_pulse`                    | MySQL database name. |
+| `DATABASE_URL` | *(built from MYSQL_* above)*      | Override to use a full URL (MySQL or SQLite). |
 | `DEBUG`        | `false`                           | Enable SQL echo / debug.   |
-| `DATABASE_URL` | `sqlite+aiosqlite:///./city_pulse.db` | Async DB URL. Use `.env` to override. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT expiry. |
+
+**MySQL setup**: Create the database and user (e.g. `CREATE DATABASE city_pulse;` and grant privileges to `MYSQL_USER`). Then run the app; tables and seed region are created on startup.
 
 ---
 

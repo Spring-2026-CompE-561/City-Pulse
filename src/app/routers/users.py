@@ -1,16 +1,16 @@
-"""User API: list, get, create, update (with password verification), delete. City location = region (san diego only)."""
+"""User API: list, get, update (with password verification), delete. Registration is via POST /api/auth/register."""
 
 import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Event, User
 from app.region_map import city_location_to_region_id, region_id_to_city_location
-from app.schemas import SuccessResponse, UserCreate, UserListResponse, UserRead, UserUpdate
+from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -58,35 +58,6 @@ async def get_user(
     return _user_to_read(user)
 
 
-@router.post("/", response_model=UserRead, status_code=201)
-async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new user. First user gets id=0, then 1, 2, ... Body: name, email, password, city_location (only 'san diego')."""
-    try:
-        region_id = city_location_to_region_id(payload.city_location)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    try:
-        max_id_result = await db.execute(select(func.max(User.id)))
-        max_id = max_id_result.scalar()
-        next_id = 0 if max_id is None else max_id + 1
-        user = User(
-            id=next_id,
-            name=payload.name,
-            email=payload.email.strip().lower(),
-            password_hash=_hash_password(payload.password),
-            region_id=region_id,
-        )
-        db.add(user)
-        await db.flush()
-        await db.refresh(user)
-        return _user_to_read(user)
-    except IntegrityError as e:
-        await db.rollback()
-        if "UNIQUE constraint failed: users.email" in str(e.orig):
-            raise HTTPException(status_code=409, detail="Email already registered") from e
-        raise HTTPException(status_code=400, detail="Invalid request") from e
-
-
 @router.put("/{id}", response_model=SuccessResponse)
 async def update_user(
     id: int = Path(..., description="User ID (the 'id' field from the user list)"),
@@ -113,7 +84,8 @@ async def update_user(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except IntegrityError as e:
         await db.rollback()
-        if "UNIQUE constraint failed: users.email" in str(e.orig):
+        msg = str(e.orig) if e.orig else str(e)
+        if "Duplicate" in msg or "UNIQUE" in msg or "1062" in msg:
             raise HTTPException(status_code=409, detail="Email already in use") from e
         raise HTTPException(status_code=400, detail="Invalid request") from e
 

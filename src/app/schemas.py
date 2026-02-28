@@ -48,6 +48,12 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, description="Your current password.")
 
 
+class RefreshRequest(BaseModel):
+    """Body for POST /api/auth/refresh to get a new access token."""
+
+    refresh_token: str = Field(..., min_length=1, description="Refresh token received from register or login.")
+
+
 # ----- Region -----
 class RegionRead(BaseModel):
     """Region: id and name (filing cabinet for events/users)."""
