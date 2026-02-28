@@ -24,8 +24,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
     openapi_tags=[
-        {"name": "Auth", "description": "Get Bearer token: POST /api/auth/login with body { \"email\": \"user@example.com\", \"password\": \"their_password\" }. Response gives access_token — use it in Authorize as Bearer <access_token>. GET /me returns the current user when authenticated."},
-        {"name": "Users", "description": "List, get, create, update, delete. city_location: only 'san diego'."},
+        {"name": "Auth", "description": "Register: POST /api/auth/register (name, email, password, city_location). Login: POST /api/auth/login (email, password). Both return access_token and refresh_token. Use access_token as Bearer for /me and protected endpoints. Refresh: POST /api/auth/refresh with { \"refresh_token\": \"...\" } to get new tokens."},
+        {"name": "Users", "description": "List, get, update, delete. Register via POST /api/auth/register only. city_location: only 'san diego'."},
         {"name": "Regions", "description": "List regions; list events and users in a region (id or 'san diego')."},
         {"name": "Events", "description": "List events in a region; create (in user's region), update, delete."},
         {"name": "Trends", "description": "Read-only for users. GET most interacted events by region; POST rebuild list; PUT update with new event/order. Priority: attendance, then comments, then likes."},

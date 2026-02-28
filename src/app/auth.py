@@ -1,4 +1,4 @@
-"""Auth: password check and in-memory tokens. Uses FastAPI OAuth2PasswordBearer + OAuth2PasswordRequestForm."""
+"""Auth: password hashing, access/refresh tokens. Register and login return tokens; refresh endpoint issues new access token."""
 
 import hashlib
 import secrets
@@ -14,13 +14,13 @@ from app.database import get_db
 from app.models import User
 
 # In-memory: token -> (user_id, expires_at). Tokens invalid on server restart.
-_token_store: dict[str, tuple[int, datetime]] = {}
+_access_token_store: dict[str, tuple[int, datetime]] = {}
+_refresh_token_store: dict[str, tuple[int, datetime]] = {}
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 
 def _hash_password(password: str) -> str:
-    """Same as users router (SHA-256)."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 
@@ -28,21 +28,43 @@ def verify_password(plain: str, password_hash: str) -> bool:
     return _hash_password(plain) == password_hash
 
 
+def hash_password(plain: str) -> str:
+    """For storing new user passwords."""
+    return _hash_password(plain)
+
+
 def create_access_token(user_id: int) -> str:
-    """Return a random token and store it with expiry. No JWT dependency."""
     token = secrets.token_urlsafe(32)
     expires = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    _token_store[token] = (user_id, expires)
+    _access_token_store[token] = (user_id, expires)
+    return token
+
+
+def create_refresh_token(user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+    _refresh_token_store[token] = (user_id, expires)
     return token
 
 
 def decode_access_token(token: str) -> dict | None:
     """Return {"sub": user_id} if token valid and not expired, else None."""
-    if not token or token not in _token_store:
+    if not token or token not in _access_token_store:
         return None
-    user_id, expires = _token_store[token]
+    user_id, expires = _access_token_store[token]
     if datetime.now(UTC) >= expires:
-        del _token_store[token]
+        del _access_token_store[token]
+        return None
+    return {"sub": str(user_id)}
+
+
+def decode_refresh_token(token: str) -> dict | None:
+    """Return {"sub": user_id} if refresh token valid and not expired, else None."""
+    if not token or token not in _refresh_token_store:
+        return None
+    user_id, expires = _refresh_token_store[token]
+    if datetime.now(UTC) >= expires:
+        del _refresh_token_store[token]
         return None
     return {"sub": str(user_id)}
 

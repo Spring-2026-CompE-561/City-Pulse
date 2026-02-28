@@ -11,10 +11,14 @@ dependencies = [
     "greenlet>=3.0.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "aiosqlite>=0.20.0",
+    "asyncmy>=0.2.9",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]
+sqlite = [
+    "aiosqlite>=0.20.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
