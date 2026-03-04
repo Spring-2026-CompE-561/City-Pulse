@@ -10,3 +10,5 @@ sys.path.insert(0, str(root / "src"))
 from app.main import app  # noqa: E402
 
 __all__ = ["app"]
+
+# test 2 switching branches and then pushing to github
