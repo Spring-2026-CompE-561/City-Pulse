@@ -1,10 +1,11 @@
 """Register, login, and refresh tokens. Use access_token as Bearer for protected endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import decode_refresh_token, get_current_user
+from app.exceptions import bad_request, conflict, unauthorized
 from app.database import get_db
 from app.schemas import LoginRequest, RefreshRequest, UserCreate, UserRead
 from app.services.auth_service import (
@@ -34,12 +35,12 @@ async def register(
     try:
         return await register_user(db, payload)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise bad_request(str(e)) from e
     except IntegrityError as e:
         await db.rollback()
         if is_duplicate_email_error(e):
-            raise HTTPException(status_code=409, detail="Email already registered") from e
-        raise HTTPException(status_code=400, detail="Invalid request") from e
+            raise conflict("Email already registered") from e
+        raise bad_request("Invalid request") from e
 
 
 @router.post("/login")
@@ -57,11 +58,7 @@ async def login(
     """
     token_pair = await login_user(db, payload)
     if token_pair is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise unauthorized("Incorrect email or password")
     return token_pair
 
 
@@ -77,19 +74,11 @@ async def refresh(payload: RefreshRequest):
     """
     data = decode_refresh_token(payload.refresh_token)
     if not data or "sub" not in data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise unauthorized("Invalid or expired refresh token")
     try:
         user_id = int(data["sub"])
     except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from None
+        raise unauthorized("Invalid refresh token") from None
     return build_token_pair(user_id)
 
 
@@ -101,9 +90,5 @@ async def me(user=Depends(get_current_user)):
     Get a token via POST /api/auth/register or POST /api/auth/login, or refresh via POST /api/auth/refresh.
     """
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise unauthorized("Not authenticated")
     return UserRead(**user_to_public(user))

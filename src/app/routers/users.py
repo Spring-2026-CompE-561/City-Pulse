@@ -3,11 +3,12 @@
 Registration is via POST /api/auth/register.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import bad_request, conflict, not_found, unauthorized
 from app.auth import verify_password
 from app.database import get_db
 from app.models import Event, User
@@ -49,7 +50,7 @@ async def get_user(
     result = await db.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise not_found("User not found")
     return _user_to_read(user)
 
 
@@ -63,9 +64,9 @@ async def update_user(
     result = await db.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise not_found("User not found")
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect password")
+        raise unauthorized("Incorrect password")
     try:
         if payload.name is not None:
             user.name = payload.name
@@ -76,13 +77,13 @@ async def update_user(
         await db.flush()
         return SuccessResponse()
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise bad_request(str(e)) from e
     except IntegrityError as e:
         await db.rollback()
         msg = str(e.orig) if e.orig else str(e)
         if "Duplicate" in msg or "UNIQUE" in msg or "1062" in msg:
-            raise HTTPException(status_code=409, detail="Email already in use") from e
-        raise HTTPException(status_code=400, detail="Invalid request") from e
+            raise conflict("Email already in use") from e
+        raise bad_request("Invalid request") from e
 
 
 @router.delete("/{id}", response_model=SuccessResponse)
@@ -94,7 +95,7 @@ async def delete_user(
     # Existence check using only id (avoids loading full row; works if schema is missing columns)
     exists = await db.execute(select(User.id).where(User.id == id))
     if exists.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise not_found("User not found")
     await db.execute(delete(Event).where(Event.user_id == id))
     await db.flush()
     await db.execute(delete(User).where(User.id == id))

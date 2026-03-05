@@ -1,9 +1,10 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import bad_request, not_found
 from app.database import get_db
 from app.models import Event, User
 from app.region_map import REGION_SAN_DIEGO_ID, parse_region_param
@@ -23,7 +24,7 @@ async def list_events(
     try:
         region_id = parse_region_param(region)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise bad_request(str(e)) from e
     result = await db.execute(
         select(Event).where(Event.region_id == region_id).offset(skip).limit(limit)
     )
@@ -39,7 +40,7 @@ async def get_event(
     """Get one event by ID. Response matches Event model."""
     event = await db.get(Event, id)
     if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+        raise not_found("Event not found")
     return event
 
 
@@ -48,11 +49,10 @@ async def create_event(payload: EventCreate, db: AsyncSession = Depends(get_db))
     """Create a new event in the user's region. User must have city_location = san diego."""
     user = await db.get(User, payload.user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise not_found("User not found")
     if user.region_id is None or user.region_id != REGION_SAN_DIEGO_ID:
-        raise HTTPException(
-            status_code=400,
-            detail="User must have city location 'san diego' to post events. Only San Diego is supported.",
+        raise bad_request(
+            "User must have city location 'san diego' to post events. Only San Diego is supported.",
         )
     event = Event(
         region_id=user.region_id,
@@ -75,7 +75,7 @@ async def update_event(
     """Update an event's title and/or content."""
     event = await db.get(Event, id)
     if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+        raise not_found("Event not found")
     if payload.title is not None:
         event.title = payload.title
     if payload.content is not None:
@@ -92,7 +92,7 @@ async def delete_event(
     """Delete an event by ID."""
     event = await db.get(Event, id)
     if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+        raise not_found("Event not found")
     await db.delete(event)
     await db.flush()
     return SuccessResponse()
