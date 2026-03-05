@@ -4,9 +4,9 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
 
 from app.config import settings
-from app.models import Base
 from app.region_map import REGION_SAN_DIEGO_ID
 
 # Resolved URL is always set by config validator (MySQL)
@@ -45,7 +45,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Create all tables and seed San Diego region (id=0) if missing."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
         await conn.execute(
             text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
             {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},

@@ -1,12 +1,14 @@
-"""User API: list, get, update (with password verification), delete. Registration is via POST /api/auth/register."""
+"""User API: list, get, update (with password verification), delete.
 
-import hashlib
+Registration is via POST /api/auth/register.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import verify_password
 from app.database import get_db
 from app.models import Event, User
 from app.region_map import city_location_to_region_id, region_id_to_city_location
@@ -15,15 +17,8 @@ from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
-def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
-def _verify_password(password: str, password_hash: str) -> bool:
-    return _hash_password(password) == password_hash
-
-
 def _user_to_read(user: User) -> UserRead:
+    """Convert a `User` ORM object to the public `UserRead` schema."""
     return UserRead(
         id=user.id,
         name=user.name,
@@ -67,9 +62,9 @@ async def update_user(
     """Update user name/email/city_location. Requires current_password. city_location only 'san diego'."""
     result = await db.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
-    if not user:
+    if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if not _verify_password(payload.current_password, user.password_hash):
+    if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect password")
     try:
         if payload.name is not None:

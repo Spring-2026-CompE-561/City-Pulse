@@ -1,19 +1,13 @@
-"""SQLAlchemy models: User, Region, Event, interactions (likes, comments, attending), Trend."""
+"""SQLModel models: User, Region, Event, interactions (likes, comments, attending), Trend."""
 
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.sql import text as sql_text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-class Base(DeclarativeBase):
-    """Declarative base for all models."""
-
-    pass
+from sqlalchemy import Column, DateTime, UniqueConstraint, func
+from sqlmodel import Field, Relationship, SQLModel
 
 
-class Region(Base):
+class Region(SQLModel, table=True):
     """
     Region model. Filing cabinet for events and users by location.
     Table: regions — id, name (e.g. San Diego). Only id=0 (san diego) for now.
@@ -21,42 +15,40 @@ class Region(Base):
 
     __tablename__ = "regions"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, nullable=False, max_length=255)
 
-    events: Mapped[list["Event"]] = relationship("Event", back_populates="region")
-    users: Mapped[list["User"]] = relationship("User", back_populates="region")
-    trends: Mapped[list["Trend"]] = relationship("Trend", back_populates="region", cascade="all, delete-orphan")
+    events: list["Event"] = Relationship(back_populates="region")
+    users: list["User"] = Relationship(back_populates="region")
+    trends: list["Trend"] = Relationship(back_populates="region")
 
 
-class User(Base):
+class User(SQLModel, table=True):
     """
     User model. Includes city location (stored as region_id).
     Table: users — id, name, email, password_hash, created_at, region_id.
-    First user gets id=0; then 1, 2, ... (id assigned in app, not autoincrement).
+    First user gets id=0; then 1, 2, ... (id assigned in app).
     """
 
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=sql_text("CURRENT_TIMESTAMP")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False, max_length=255)
+    email: str = Field(nullable=False, max_length=255, index=True)
+    password_hash: str = Field(nullable=False, max_length=255)
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
-    region_id: Mapped[int | None] = mapped_column(
-        ForeignKey("regions.id"), nullable=True, index=True
-    )
+    region_id: Optional[int] = Field(default=None, foreign_key="regions.id", index=True)
 
-    region: Mapped["Region | None"] = relationship("Region", back_populates="users")
-    events: Mapped[list["Event"]] = relationship("Event", back_populates="user")
-    event_likes: Mapped[list["EventLike"]] = relationship("EventLike", back_populates="user", cascade="all, delete-orphan")
-    event_comments: Mapped[list["EventComment"]] = relationship("EventComment", back_populates="user", cascade="all, delete-orphan")
-    event_attending: Mapped[list["EventAttending"]] = relationship("EventAttending", back_populates="user", cascade="all, delete-orphan")
+    region: Optional[Region] = Relationship(back_populates="users")
+    events: list["Event"] = Relationship(back_populates="user")
+    event_likes: list["EventLike"] = Relationship(back_populates="user")
+    event_comments: list["EventComment"] = Relationship(back_populates="user")
+    event_attending: list["EventAttending"] = Relationship(back_populates="user")
 
 
-class Event(Base):
+class Event(SQLModel, table=True):
     """
     Event model. A post in a region (and optionally by a user).
     Table: events — id, region_id, user_id, title, content, created_at.
@@ -64,86 +56,84 @@ class Event(Base):
 
     __tablename__ = "events"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id"), nullable=False, index=True)
-    user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    title: Mapped[str] = mapped_column(String(512), nullable=False)
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=sql_text("CURRENT_TIMESTAMP")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    region_id: int = Field(foreign_key="regions.id", index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    title: str = Field(nullable=False, max_length=512)
+    content: Optional[str] = Field(default=None)
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
 
-    region: Mapped["Region"] = relationship("Region", back_populates="events")
-    user: Mapped["User | None"] = relationship("User", back_populates="events")
-    likes: Mapped[list["EventLike"]] = relationship("EventLike", back_populates="event", cascade="all, delete-orphan")
-    comments: Mapped[list["EventComment"]] = relationship("EventComment", back_populates="event", cascade="all, delete-orphan")
-    attending: Mapped[list["EventAttending"]] = relationship("EventAttending", back_populates="event", cascade="all, delete-orphan")
-    trend_entries: Mapped[list["Trend"]] = relationship("Trend", back_populates="event", cascade="all, delete-orphan")
+    region: Region = Relationship(back_populates="events")
+    user: Optional[User] = Relationship(back_populates="events")
+    likes: list["EventLike"] = Relationship(back_populates="event")
+    comments: list["EventComment"] = Relationship(back_populates="event")
+    attending: list["EventAttending"] = Relationship(back_populates="event")
+    trend_entries: list["Trend"] = Relationship(back_populates="event")
 
 
-class EventLike(Base):
+class EventLike(SQLModel, table=True):
     """User liked an event. One row per (user_id, event_id)."""
 
     __tablename__ = "event_likes"
     __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_event_like_user_event"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    event_id: int = Field(foreign_key="events.id", index=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="event_likes")
-    event: Mapped["Event"] = relationship("Event", back_populates="likes")
+    user: User = Relationship(back_populates="event_likes")
+    event: Event = Relationship(back_populates="likes")
 
 
-class EventComment(Base):
+class EventComment(SQLModel, table=True):
     """User commented on an event."""
 
     __tablename__ = "event_comments"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=sql_text("CURRENT_TIMESTAMP")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    event_id: int = Field(foreign_key="events.id", index=True)
+    text: str = Field(nullable=False)
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="event_comments")
-    event: Mapped["Event"] = relationship("Event", back_populates="comments")
+    user: User = Relationship(back_populates="event_comments")
+    event: Event = Relationship(back_populates="comments")
 
 
-class EventAttending(Base):
+class EventAttending(SQLModel, table=True):
     """User is attending an event. One row per (user_id, event_id)."""
 
     __tablename__ = "event_attending"
     __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_event_attending_user_event"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    event_id: int = Field(foreign_key="events.id", index=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="event_attending")
-    event: Mapped["Event"] = relationship("Event", back_populates="attending")
+    user: User = Relationship(back_populates="event_attending")
+    event: Event = Relationship(back_populates="attending")
 
 
-class Trend(Base):
+class Trend(SQLModel, table=True):
     """Cached trend list per region: event_id, rank, and snapshot counts. Order: 1st attendance, 2nd comments, 3rd likes."""
 
     __tablename__ = "trends"
     __table_args__ = (UniqueConstraint("region_id", "event_id", name="uq_trend_region_event"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    region_id: Mapped[int] = mapped_column(ForeignKey("regions.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
-    rank: Mapped[int] = mapped_column(Integer, nullable=False)
-    attendance_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    comments_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    likes_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=sql_text("CURRENT_TIMESTAMP")
+    id: Optional[int] = Field(default=None, primary_key=True)
+    region_id: int = Field(foreign_key="regions.id", index=True)
+    event_id: int = Field(foreign_key="events.id", index=True)
+    rank: int
+    attendance_count: int = 0
+    comments_count: int = 0
+    likes_count: int = 0
+    updated_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
 
-    region: Mapped["Region"] = relationship("Region", back_populates="trends")
-    event: Mapped["Event"] = relationship("Event", back_populates="trend_entries")
+    region: Region = Relationship(back_populates="trends")
+    event: Event = Relationship(back_populates="trend_entries")
