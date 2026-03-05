@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app import models  # ensure all models registered with Base before init_db
+from app import models  # ensure all SQLModel models are imported before init_db
 from app.config import settings
 from app.database import init_db
 from app.routers import auth, events, interactions, regions, trends, users

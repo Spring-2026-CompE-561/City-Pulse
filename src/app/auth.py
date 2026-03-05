@@ -13,7 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import User
 
-# In-memory: token -> (user_id, expires_at). Tokens invalid on server restart.
+# In-memory token stores: token -> (user_id, expires_at). Tokens are lost on server restart.
 _access_token_store: dict[str, tuple[int, datetime]] = {}
 _refresh_token_store: dict[str, tuple[int, datetime]] = {}
 
@@ -21,15 +21,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False
 
 
 def _hash_password(password: str) -> str:
+    """Return a SHA-256 hash for the given plain-text password."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 
 def verify_password(plain: str, password_hash: str) -> bool:
+    """Check whether a plain-text password matches the stored hash."""
     return _hash_password(plain) == password_hash
 
 
 def hash_password(plain: str) -> str:
-    """For storing new user passwords."""
+    """Hash a new user password for storage in the database."""
     return _hash_password(plain)
 
 
