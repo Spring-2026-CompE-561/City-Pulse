@@ -1,4 +1,17 @@
-"""Pydantic schemas for API request/response."""
+"""
+Pydantic schemas for API request/response models.
+
+What lives here
+- Pure data models (no DB access) used to validate incoming request bodies and
+  shape outgoing responses.
+
+Called by / import relationships
+- Routers import these classes and declare them as:
+  - request bodies (e.g. `payload: UserCreate`)
+  - response models (e.g. `response_model=UserRead`)
+- Some routers return ORM models directly (e.g. Event), and `from_attributes=True`
+  enables Pydantic to read ORM attributes into response schemas.
+"""
 
 from datetime import datetime
 
@@ -9,16 +22,22 @@ from pydantic import BaseModel, ConfigDict, Field
 class UserCreate(BaseModel):
     """Create user: name, email, password, city_location (only 'san diego' allowed)."""
 
+    # Display name (required).
     name: str = Field(..., min_length=1, max_length=255)
+    # Login identifier; normalized to lower-case in services/routers.
     email: str = Field(..., min_length=1, max_length=255)
+    # Plain-text password provided by the client; hashed before storage (`app.auth.hash_password`).
     password: str = Field(..., min_length=1)
+    # Human-friendly location string; mapped to `User.region_id` using `app.region_map.city_location_to_region_id`.
     city_location: str = Field(..., description="Only 'san diego' is supported.")
 
 
 class UserUpdate(BaseModel):
     """Update user: current_password required; name, email, city_location optional."""
 
+    # Required to authorize updates (verified via `app.auth.verify_password`).
     current_password: str = Field(..., min_length=1, description="Password to verify identity")
+    # Optional changes.
     name: str | None = Field(None, min_length=1, max_length=255)
     email: str | None = Field(None, min_length=1, max_length=255)
     city_location: str | None = Field(None, description="Only 'san diego' is supported.")
@@ -27,6 +46,7 @@ class UserUpdate(BaseModel):
 class UserRead(BaseModel):
     """User response: id, name, email, city_location (from region_id), created_at. Built in router, not from ORM."""
 
+    # Public fields only (no password_hash).
     id: int
     name: str
     email: str
@@ -37,6 +57,7 @@ class UserRead(BaseModel):
 class UserListResponse(BaseModel):
     """Single object containing the user list and count. GET /api/users/ returns this."""
 
+    # Returned by `app.routers.users.list_users`.
     users: list[UserRead]
     count: int
 
@@ -44,6 +65,7 @@ class UserListResponse(BaseModel):
 class LoginRequest(BaseModel):
     """Same as user identity: email and password only (no username)."""
 
+    # Consumed by `app.routers.auth.login` -> `app.services.auth_service.login_user`.
     email: str = Field(..., min_length=1, description="Your email (same as when you created the account).")
     password: str = Field(..., min_length=1, description="Your current password.")
 
@@ -51,6 +73,7 @@ class LoginRequest(BaseModel):
 class RefreshRequest(BaseModel):
     """Body for POST /api/auth/refresh to get a new access token."""
 
+    # Used by `app.routers.auth.refresh`.
     refresh_token: str = Field(..., min_length=1, description="Refresh token received from register or login.")
 
 
@@ -58,6 +81,7 @@ class RefreshRequest(BaseModel):
 class RegionRead(BaseModel):
     """Region: id and name (filing cabinet for events/users)."""
 
+    # Allows building this schema from ORM objects (Region SQLModel instances).
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -68,6 +92,7 @@ class RegionRead(BaseModel):
 class EventCreate(BaseModel):
     """Body for POST /api/events/: user_id, title, content. Region comes from user."""
 
+    # Author user id; router validates that user exists and is in San Diego.
     user_id: int = Field(..., description="User posting the event (must have city_location = san diego).")
     title: str = Field(..., min_length=1, max_length=512)
     content: str | None = Field(None, max_length=10000)
@@ -76,6 +101,7 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     """Body for PUT /api/events/{id}: optional title and/or content."""
 
+    # Partial update fields; router only updates provided values.
     title: str | None = Field(None, min_length=1, max_length=512)
     content: str | None = None
 
@@ -83,6 +109,7 @@ class EventUpdate(BaseModel):
 class EventRead(BaseModel):
     """Response for GET /api/events/ and GET /api/events/{id}. Same fields as Event model."""
 
+    # Allows building this schema from ORM objects (Event SQLModel instances).
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -109,12 +136,14 @@ class TrendEntryRead(BaseModel):
 class TrendRebuildBody(BaseModel):
     """Body for POST /api/trends: rebuild trend list for a region."""
 
+    # Parsed using `app.region_map.parse_region_param`.
     region: str | int = Field("san diego", description="Region: 'san diego' or 0")
 
 
 class TrendUpdateBody(BaseModel):
     """Body for PUT /api/trends: add/update one event in the trend list and reorder."""
 
+    # `rank` is optional; the service/router will reorder by interaction stats either way.
     region: str | int = Field("san diego", description="Region: 'san diego' or 0")
     event_id: int = Field(..., description="Event to add or update in trends")
     rank: int | None = Field(None, ge=1, description="New rank (1-based). If omitted, event is appended or reordered by stats.")
@@ -130,6 +159,7 @@ class CommentRead(BaseModel):
     text: str
     created_at: datetime
 
+    # Allows building this schema from ORM objects (EventComment SQLModel instances).
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -147,6 +177,7 @@ class EventWithInteractionsRead(BaseModel):
     attendance_count: int = 0
     comments: list[CommentRead] = Field(default_factory=list)
 
+    # Allows model validation from ORM attributes (Event) plus extra computed fields.
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -181,4 +212,5 @@ class InteractionRemoveBody(BaseModel):
 class SuccessResponse(BaseModel):
     """Standard success for PUT/DELETE."""
 
+    # Most endpoints return `{ "success": true }` for simple acknowledgements.
     success: bool = True
