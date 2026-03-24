@@ -4,15 +4,19 @@ Registration is via POST /api/auth/register.
 """
 
 from fastapi import APIRouter, Depends, Path
-from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import bad_request, conflict, not_found, unauthorized
 from app.auth import verify_password
 from app.database import get_db
-from app.models import Event, User
+from app.models import User
 from app.region_map import city_location_to_region_id, region_id_to_city_location
+from app.repositories.user_repository import (
+    delete_user_and_events,
+    get_user_by_id,
+    list_users as list_user_rows,
+)
 from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -36,8 +40,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
     """Get users in a single object: { users: [...], count: N }."""
-    result = await db.execute(select(User).offset(skip).limit(limit))
-    rows = list(result.scalars().all())
+    rows = await list_user_rows(db, skip=skip, limit=limit)
     return UserListResponse(users=[_user_to_read(u) for u in rows], count=len(rows))
 
 
@@ -47,8 +50,7 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
 ):
     """Get one user by ID."""
-    result = await db.execute(select(User).where(User.id == id))
-    user = result.scalar_one_or_none()
+    user = await get_user_by_id(db, id)
     if not user:
         raise not_found("User not found")
     return _user_to_read(user)
@@ -61,8 +63,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
 ):
     """Update user name/email/city_location. Requires current_password. city_location only 'san diego'."""
-    result = await db.execute(select(User).where(User.id == id))
-    user = result.scalar_one_or_none()
+    user = await get_user_by_id(db, id)
     if user is None:
         raise not_found("User not found")
     if not verify_password(payload.current_password, user.password_hash):
@@ -92,12 +93,8 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a user by ID. Any events owned by the user are deleted first."""
-    # Existence check using only id (avoids loading full row; works if schema is missing columns)
-    exists = await db.execute(select(User.id).where(User.id == id))
-    if exists.scalar_one_or_none() is None:
+    exists = await get_user_by_id(db, id)
+    if exists is None:
         raise not_found("User not found")
-    await db.execute(delete(Event).where(Event.user_id == id))
-    await db.flush()
-    await db.execute(delete(User).where(User.id == id))
-    await db.flush()
+    await delete_user_and_events(db, id)
     return SuccessResponse()

@@ -1,5 +1,8 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from app.models import Event, User
 
@@ -26,6 +29,7 @@ async def create_user(
         name=name,
         email=email,
         password_hash=password_hash,
+        created_at=datetime.now(timezone.utc),
         region_id=region_id,
     )
     db.add(user)
@@ -36,7 +40,7 @@ async def create_user(
 
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     """Return a single user by email, or None."""
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(select(User).where(col(User.email) == email))
     return result.scalar_one_or_none()
 
 
@@ -54,7 +58,9 @@ async def list_users(db: AsyncSession, *, skip: int, limit: int) -> list[User]:
 async def delete_user_and_events(db: AsyncSession, user_id: int) -> None:
     """Delete a user and their events (events first)."""
     # Existence check using only id (kept small on purpose).
-    exists_result = await db.execute(select(User.id).where(User.id == user_id))
+    exists_result = await db.execute(
+        select(col(User.id)).where(col(User.id) == user_id)
+    )
     if exists_result.scalar_one_or_none() is None:
         return
     await db.execute(

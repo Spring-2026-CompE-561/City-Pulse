@@ -1,12 +1,18 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
 from fastapi import APIRouter, Body, Depends, Path, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import bad_request, not_found
 from app.database import get_db
-from app.models import Event, User
+from app.models import User
+from app.repositories.event_repository import (
+    create_event as create_event_row,
+    delete_event as delete_event_row,
+    get_event_by_id,
+    list_events_by_region,
+    update_event_fields,
+)
 from app.region_map import REGION_SAN_DIEGO_ID, parse_region_param
 from app.schemas import EventCreate, EventRead, EventUpdate, SuccessResponse
 
@@ -25,11 +31,7 @@ async def list_events(
         region_id = parse_region_param(region)
     except ValueError as e:
         raise bad_request(str(e)) from e
-    result = await db.execute(
-        select(Event).where(Event.region_id == region_id).offset(skip).limit(limit)
-    )
-    events = list(result.scalars().all())
-    return events
+    return await list_events_by_region(db, region_id=region_id, skip=skip, limit=limit)
 
 
 @router.get("/{id}", response_model=EventRead)
@@ -38,7 +40,7 @@ async def get_event(
     db: AsyncSession = Depends(get_db),
 ):
     """Get one event by ID. Response matches Event model."""
-    event = await db.get(Event, id)
+    event = await get_event_by_id(db, id)
     if not event:
         raise not_found("Event not found")
     return event
@@ -54,15 +56,13 @@ async def create_event(payload: EventCreate, db: AsyncSession = Depends(get_db))
         raise bad_request(
             "User must have city location 'san diego' to post events. Only San Diego is supported.",
         )
-    event = Event(
+    event = await create_event_row(
+        db,
         region_id=user.region_id,
         user_id=user.id,
         title=payload.title,
         content=payload.content,
     )
-    db.add(event)
-    await db.flush()
-    await db.refresh(event)
     return event
 
 
@@ -73,14 +73,10 @@ async def update_event(
     db: AsyncSession = Depends(get_db),
 ):
     """Update an event's title and/or content."""
-    event = await db.get(Event, id)
+    event = await get_event_by_id(db, id)
     if not event:
         raise not_found("Event not found")
-    if payload.title is not None:
-        event.title = payload.title
-    if payload.content is not None:
-        event.content = payload.content
-    await db.flush()
+    await update_event_fields(db, event=event, title=payload.title, content=payload.content)
     return SuccessResponse()
 
 
@@ -90,9 +86,8 @@ async def delete_event(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an event by ID."""
-    event = await db.get(Event, id)
+    event = await get_event_by_id(db, id)
     if not event:
         raise not_found("Event not found")
-    await db.delete(event)
-    await db.flush()
+    await delete_event_row(db, event=event)
     return SuccessResponse()
