@@ -1,11 +1,23 @@
 """Interactions API: list events with interactions; add/remove likes, comments, attending."""
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Event, EventAttending, EventComment, EventLike
+from app.repositories.event_repository import get_event_by_id, list_events_by_region
+from app.repositories.interaction_repository import (
+    add_attending as add_attending_row,
+    add_comment as add_comment_row,
+    add_like as add_like_row,
+    get_attending,
+    get_comment_by_id,
+    get_event_interaction_counts,
+    get_like,
+    list_comments_for_event,
+    remove_attending as remove_attending_row,
+    remove_comment as remove_comment_row,
+    remove_like as remove_like_row,
+)
 from app.region_map import parse_region_param
 from app.schemas import (
     CommentRead,
@@ -31,25 +43,13 @@ async def list_events_with_interactions(
         region_id = parse_region_param(region)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    result = await db.execute(
-        select(Event).where(Event.region_id == region_id).offset(skip).limit(limit)
-    )
-    events = list(result.scalars().all())
+    events = await list_events_by_region(db, region_id=region_id, skip=skip, limit=limit)
     out = []
     for ev in events:
-        likes_count = await db.execute(
-            select(func.count(EventLike.id)).where(EventLike.event_id == ev.id)
+        likes_value, comments_value, attendance_value = await get_event_interaction_counts(
+            db, event_id=ev.id
         )
-        comments_count = await db.execute(
-            select(func.count(EventComment.id)).where(EventComment.event_id == ev.id)
-        )
-        attendance_count = await db.execute(
-            select(func.count(EventAttending.id)).where(EventAttending.event_id == ev.id)
-        )
-        comments_result = await db.execute(
-            select(EventComment).where(EventComment.event_id == ev.id).order_by(EventComment.created_at)
-        )
-        comments = list(comments_result.scalars().all())
+        comments = await list_comments_for_event(db, event_id=ev.id)
         out.append(
             EventWithInteractionsRead(
                 id=ev.id,
@@ -58,9 +58,9 @@ async def list_events_with_interactions(
                 title=ev.title,
                 content=ev.content,
                 created_at=ev.created_at,
-                likes_count=likes_count.scalar() or 0,
-                comments_count=comments_count.scalar() or 0,
-                attendance_count=attendance_count.scalar() or 0,
+                likes_count=likes_value,
+                comments_count=comments_value,
+                attendance_count=attendance_value,
                 comments=[CommentRead.model_validate(c) for c in comments],
             )
         )
@@ -74,17 +74,13 @@ async def add_like(
     db: AsyncSession = Depends(get_db),
 ):
     """Add a like from a user to an event (idempotent: already liked is success)."""
-    event = await db.get(Event, event_id)
+    event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    existing = await db.execute(
-        select(EventLike).where(EventLike.event_id == event_id, EventLike.user_id == payload.user_id)
-    )
-    if existing.scalar_one_or_none():
+    existing = await get_like(db, event_id=event_id, user_id=payload.user_id)
+    if existing:
         return SuccessResponse()
-    like = EventLike(event_id=event_id, user_id=payload.user_id)
-    db.add(like)
-    await db.flush()
+    await add_like_row(db, event_id=event_id, user_id=payload.user_id)
     return SuccessResponse()
 
 
@@ -95,17 +91,15 @@ async def add_comment(
     db: AsyncSession = Depends(get_db),
 ):
     """Add a comment from a user to an event."""
-    event = await db.get(Event, event_id)
+    event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    comment = EventComment(
+    comment = await add_comment_row(
+        db,
         event_id=event_id,
         user_id=payload.user_id,
         text=payload.text,
     )
-    db.add(comment)
-    await db.flush()
-    await db.refresh(comment)
     return comment
 
 
@@ -116,20 +110,13 @@ async def add_attending(
     db: AsyncSession = Depends(get_db),
 ):
     """Add attendance: user marks they are attending the event (idempotent)."""
-    event = await db.get(Event, event_id)
+    event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    existing = await db.execute(
-        select(EventAttending).where(
-            EventAttending.event_id == event_id,
-            EventAttending.user_id == payload.user_id,
-        )
-    )
-    if existing.scalar_one_or_none():
+    existing = await get_attending(db, event_id=event_id, user_id=payload.user_id)
+    if existing:
         return SuccessResponse()
-    attending = EventAttending(event_id=event_id, user_id=payload.user_id)
-    db.add(attending)
-    await db.flush()
+    await add_attending_row(db, event_id=event_id, user_id=payload.user_id)
     return SuccessResponse()
 
 
@@ -140,14 +127,10 @@ async def remove_like(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a user's like from an event."""
-    result = await db.execute(
-        select(EventLike).where(EventLike.event_id == event_id, EventLike.user_id == user_id)
-    )
-    like = result.scalar_one_or_none()
+    like = await get_like(db, event_id=event_id, user_id=user_id)
     if not like:
         raise HTTPException(status_code=404, detail="Like not found")
-    await db.delete(like)
-    await db.flush()
+    await remove_like_row(db, like=like)
     return SuccessResponse()
 
 
@@ -159,13 +142,12 @@ async def remove_comment(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a user's comment from an event (comment must belong to the user)."""
-    comment = await db.get(EventComment, comment_id)
+    comment = await get_comment_by_id(db, comment_id=comment_id)
     if not comment or comment.event_id != event_id:
         raise HTTPException(status_code=404, detail="Comment not found")
     if comment.user_id != user_id:
         raise HTTPException(status_code=403, detail="Cannot delete another user's comment")
-    await db.delete(comment)
-    await db.flush()
+    await remove_comment_row(db, comment=comment)
     return SuccessResponse()
 
 
@@ -176,15 +158,8 @@ async def remove_attending(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a user's attendance from an event."""
-    result = await db.execute(
-        select(EventAttending).where(
-            EventAttending.event_id == event_id,
-            EventAttending.user_id == user_id,
-        )
-    )
-    attending = result.scalar_one_or_none()
+    attending = await get_attending(db, event_id=event_id, user_id=user_id)
     if not attending:
         raise HTTPException(status_code=404, detail="Attendance record not found")
-    await db.delete(attending)
-    await db.flush()
+    await remove_attending_row(db, attending=attending)
     return SuccessResponse()

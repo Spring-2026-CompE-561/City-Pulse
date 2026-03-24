@@ -1,6 +1,6 @@
 # City Pulse
 
-Location-based trend aggregation web application. Informs users about significant events, market trends, and discussions in their region in real time (e.g. *“heatwave San Diego”*).
+Location-based events + trends platform (backend API). Users can register/login, create events (currently **San Diego only**), interact (likes/comments/attending), and view a ranked “trending” list driven by interactions.
 
 ---
 
@@ -12,6 +12,7 @@ Location-based trend aggregation web application. Informs users about significan
 | Server      | [Uvicorn](https://www.uvicorn.org/) |
 | ORM / DB    | [SQLModel](https://sqlmodel.tiangolo.com/) (on top of [SQLAlchemy](https://docs.sqlalchemy.org/) 2.x, async) + [asyncmy](https://github.com/long2ice/asyncmy) (MySQL). |
 | Validation   | [Pydantic](https://docs.pydantic.dev/) + [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
+| Auth        | JWT access + refresh tokens |
 | Code quality | [Ruff](https://docs.astral.sh/ruff/), [Black](https://black.readthedocs.io/), [pre-commit](https://pre-commit.com/) |
 
 ---
@@ -20,8 +21,8 @@ Location-based trend aggregation web application. Informs users about significan
 
 ```
 City-Pulse/
-├── py-project.toml       # Project config, dependencies, tools
-├── pre-commit-config.yml # Pre-commit hooks (Ruff, Black)
+├── pyproject.toml        # Project config, dependencies, tools
+├── .pre-commit-config.yml # Pre-commit hooks (Ruff, Black)
 ├── .vscode/
 │   └── settings.json     # Python interpreter & analysis path
 └── src/
@@ -32,121 +33,31 @@ City-Pulse/
     │   ├── database.py   # Async engine, session, init_db
     │   ├── models.py     # SQLModel models (User, Region, Event, interactions, Trend)
     │   ├── schemas.py    # Pydantic request/response schemas
+    │   ├── auth.py       # JWT helpers, current user dependency
+    │   ├── services/     # Service-layer helpers (auth, etc.)
+    │   ├── region_map.py # San Diego-only mapping helpers
     │   └── routers/      # API route modules
+    │       ├── auth.py
     │       ├── users.py
     │       ├── regions.py
     │       ├── events.py
-    │       └── trends.py
+    │       ├── trends.py
+    │       └── interactions.py
     └── test/
         └── main.py       # Tests
 ```
 
 ---
 
-## What each part does
-
-### `py-project.toml`
-
-- **Project metadata**: name, version, description, Python ≥3.11.
-- **Dependencies**: FastAPI, Uvicorn, SQLAlchemy, SQLModel, Pydantic, Pydantic-Settings, asyncmy (MySQL).
-- **Optional dev**: pytest, pytest-asyncio, httpx, ruff, black, pre-commit.
-- **Build**: Hatch; package lives in `src/app`.
-- **Tools**: Ruff and Black config (line length, target version), pytest asyncio and test path.
-
-**Resources:** [PyPA – pyproject.toml](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) · [Hatch](https://hatch.pypa.io/)
-
----
-
-### `pre-commit-config.yml`
-
-Runs before each commit:
-
-- **Ruff**: lint and auto-fix.
-- **Black**: format code.
-
-**Resources:** [pre-commit](https://pre-commit.com/) · [Ruff pre-commit](https://docs.astral.sh/ruff/integration/#pre-commit) · [Black integration](https://black.readthedocs.io/en/stable/integrations/source_version_control.html)
-
----
-
-### `src/app/config.py`
-
-- Loads settings from environment or a `.env` file (see `.env.example`).
-- **MySQL (default)**: builds `database_url` from `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` if `DATABASE_URL` is not set.
-- Or set `DATABASE_URL` to a full MySQL URL (e.g. `mysql+asyncmy://...`).
-- Defines `debug` and token expiry. Single `settings` instance used across the app.
-
-**Resources:** [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
-
----
-
-### `src/app/database.py`
-
-- **Engine**: async SQLAlchemy engine from `config.database_url` (MySQL by default). Uses connection pooling (`pool_size`, `max_overflow`, `pool_pre_ping`) for concurrent users.
-- **Session**: async session factory and `get_db()` dependency for request-scoped sessions (commit/rollback/close).
-- **init_db()**: creates all tables via SQLModel and seeds the San Diego region (called on app startup in `main.py`). Uses MySQL.
-
-**Resources:** [SQLAlchemy asyncio](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) · [AsyncSession](https://docs.sqlalchemy.org/en/20/orm/session_api.html#sqlalchemy.ext.asyncio.AsyncSession)
-
----
-
-### `src/app/models.py`
-
-SQLAlchemy ORM models:
-
-- **User**: `id`, `created_at`, `email`, `display_name`; many-to-many with regions via `user_regions`.
-- **Region**: `id`, `name`, `slug` (e.g. `san-diego`), `created_at`; has events and users.
-- **UserRegion**: join table for user ↔ region.
-- **Event**: `id`, `region_id`, `timestamp`, `category`, `sentiment_score`, `source_url`, `raw_data` (JSON), `title`, `summary`.
-
-**Resources:** [SQLAlchemy 2.0 ORM](https://docs.sqlalchemy.org/en/20/orm/) · [Declarative mapping](https://docs.sqlalchemy.org/en/20/orm/mapping_styles.html#declarative-mapping)
-
----
-
-### `src/app/schemas.py`
-
-Pydantic models for API:
-
-- **Users**: UserCreate, UserRead.
-- **Regions**: RegionBase/RegionCreate/RegionRead (slug pattern e.g. `san-diego`).
-- **Events**: EventBase/EventCreate/EventRead (category, sentiment, source_url, raw_data, etc.).
-- **Trends**: TrendItem (topic, region_slug, event_count, avg_sentiment, sample_title/source_url), TrendList.
-
-**Resources:** [Pydantic models](https://docs.pydantic.dev/latest/concepts/models/) · [Field](https://docs.pydantic.dev/latest/concepts/fields/)
-
----
-
-### `src/app/main.py`
-
-- **FastAPI app**: title “City Pulse”, description, version, lifespan.
-- **Lifespan**: calls `init_db()` on startup.
-- **Routers**: `users`, `regions`, `events`, `trends` mounted at `/users`, `/regions`, `/events`, `/trends`.
-- **Root**: `GET /` returns service info and links to `/docs`, `/openapi.json`, and the main endpoints.
-
-**Resources:** [FastAPI app](https://fastapi.tiangolo.com/tutorial/first-steps/) · [Lifespan](https://fastapi.tiangolo.com/advanced/events/) · [APIRouter](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
-
----
-
-### `src/app/routers/`
-
-| Router     | Prefix   | Purpose |
-|-----------|----------|--------|
-| **users** | `/users` | List, get by id, create users. |
-| **regions** | `/regions` | List (optional filter by `slug`), get by id, create regions. |
-| **events** | `/events` | List (optional `region_id`, `category`), get by id, create events (with timestamp, category, sentiment, source_url, raw_data). |
-| **trends** | `/trends` | Aggregated trends by topic and region (e.g. “heatwave san diego”): optional `region_slug`, `category`, `limit`. |
-
-**Resources:** [FastAPI dependency injection](https://fastapi.tiangolo.com/tutorial/dependencies/) (e.g. `get_db`) · [Query parameters](https://fastapi.tiangolo.com/tutorial/query-params/)
-
----
-
 ## Run the project
 
-1. **Create and use a virtual environment** (recommended):
+### Local setup (Windows / PowerShell)
+
+1. **Create and activate a virtual environment**:
 
    ```bash
    python -m venv .venv
-   .venv\Scripts\activate   # Windows
-   # source .venv/bin/activate  # macOS/Linux
+   .\.venv\Scripts\Activate.ps1
    ```
 
 2. **Install dependencies** (from repo root):
@@ -155,24 +66,23 @@ Pydantic models for API:
    pip install -e .
    ```
 
-   If your project file is `py-project.toml` and your tool expects `pyproject.toml`, either rename it or install with:
+3. **Configure environment** (MySQL):
+
+   - Set a full `DATABASE_URL`, or set `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`.
+   - You can use a `.env` file in the repo root (loaded automatically via Pydantic Settings).
+
+4. **Run the API** (from repo root, with `src` on `PYTHONPATH`):
 
    ```bash
-   pip install fastapi "uvicorn[standard]" sqlalchemy sqlmodel pydantic pydantic-settings asyncmy
+   $env:PYTHONPATH="src"
+   uvicorn app.main:app --reload
    ```
 
-3. **Run the API** (from repo root, with `src` on `PYTHONPATH`):
+5. **Open**:
 
-   ```bash
-   # Windows (PowerShell)
-   $env:PYTHONPATH="src"; uvicorn app.main:app --reload
-
-   # macOS/Linux
-   PYTHONPATH=src uvicorn app.main:app --reload
-   ```
-
-4. **Open**: [http://127.0.0.1:8000](http://127.0.0.1:8000) — root info.  
-   **Interactive API docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+   - API root: `http://127.0.0.1:8000/`
+   - Swagger UI: `http://127.0.0.1:8000/docs`
+   - OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
 ---
 
@@ -189,32 +99,75 @@ After that, Ruff and Black run automatically on commit.
 
 ## Environment
 
-Copy `.env.example` to `.env` and set values. Used for MySQL (and optional overrides).
+Create a `.env` file in the repo root (or export env vars) to configure the database and token lifetimes.
 
 | Variable        | Default / built value             | Description |
 |----------------|-----------------------------------|-------------|
-| `MYSQL_HOST`   | `localhost`                       | MySQL host. |
-| `MYSQL_PORT`   | `3306`                            | MySQL port. |
-| `MYSQL_USER`   | `city_pulse`                      | MySQL user. |
-| `MYSQL_PASSWORD` | *(empty)*                       | MySQL password. Set in `.env`. |
-| `MYSQL_DATABASE` | `city_pulse`                    | MySQL database name. |
-| `DATABASE_URL` | *(built from MYSQL_* above)*      | Override to use a full MySQL URL. |
-| `DEBUG`        | `false`                           | Enable SQL echo / debug.   |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT expiry. |
+| `DATABASE_URL` | *(optional)* | Full DB URL override (recommended). Example: `mysql+asyncmy://user:pass@localhost:3306/city_pulse?charset=utf8mb4` |
+| `MYSQL_HOST`   | `localhost`  | MySQL host (used only if `DATABASE_URL` is not set). |
+| `MYSQL_PORT`   | `3306`       | MySQL port. |
+| `MYSQL_USER`   | *(varies)*   | MySQL user. |
+| `MYSQL_PASSWORD` | *(required)* | MySQL password. |
+| `MYSQL_DATABASE` | `city_pulse` | MySQL database name. |
+| `DEBUG`        | `false`      | If true, returns more detailed 500 errors and enables verbose debugging. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token expiry (minutes). |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token expiry (days). |
 
-**MySQL setup**: Create the database and user (e.g. `CREATE DATABASE city_pulse;` and grant privileges to `MYSQL_USER`). Then run the app; tables and seed region are created on startup.
+**Startup behavior**: on app startup it creates tables (if missing) and seeds the default region data.
 
 ---
 
 ## API overview
 
-- **`GET /`** — Service name, link to docs, list of endpoints.
-- **`GET /docs`** — Swagger UI.
-- **`GET /openapi.json`** — OpenAPI schema.
-- **`/users`** — CRUD-style: list, get, create.
-- **`/regions`** — List (filter by `slug`), get, create.
-- **`/events`** — List (filter by `region_id`, `category`), get, create.
-- **`/trends`** — Aggregated trends; query params: `region_slug`, `category`, `limit`.
+### Service discovery
+
+- **`GET /`**: service info + quick list of API prefixes
+- **`GET /docs`**: Swagger UI
+- **`GET /openapi.json`**: OpenAPI schema
+
+### Auth (`/api/auth`)
+
+- **`POST /api/auth/register`**: create account, returns `{ access_token, refresh_token, token_type }`
+- **`POST /api/auth/login`**: returns `{ access_token, refresh_token, token_type }`
+- **`POST /api/auth/refresh`**: exchange refresh token for a new token pair
+- **`GET /api/auth/me`**: current user (requires `Authorization: Bearer <access_token>`)
+
+### Users (`/api/users`)
+
+- **`GET /api/users?skip=0&limit=50`**
+- **`GET /api/users/{id}`**
+- **`PUT /api/users/{id}`**: update name/email/city_location (requires `current_password`; city_location currently only supports “san diego”)
+- **`DELETE /api/users/{id}`**
+
+### Regions (`/api/regions`)
+
+- **`GET /api/regions`**
+- **`GET /api/regions/{region_id_or_name}/events`**: `region_id_or_name` can be `0`, `san diego`, or `san-diego`
+- **`GET /api/regions/{region_id_or_name}/users`**
+
+### Events (`/api/events`)
+
+- **`GET /api/events?region=san%20diego&skip=0&limit=50`**
+- **`GET /api/events/{id}`**
+- **`POST /api/events`**: create event for a user (user must be in the San Diego region)
+- **`PUT /api/events/{id}`**
+- **`DELETE /api/events/{id}`**
+
+### Interactions (`/api/interactions`)
+
+- **`GET /api/interactions?region=san%20diego&skip=0&limit=50`**: returns events with likes/comments/attendance counts + comment list
+- **`PUT /api/interactions/events/{event_id}/likes`**
+- **`DELETE /api/interactions/events/{event_id}/likes?user_id=...`**
+- **`PUT /api/interactions/events/{event_id}/comments`**
+- **`DELETE /api/interactions/events/{event_id}/comments/{comment_id}?user_id=...`**
+- **`PUT /api/interactions/events/{event_id}/attending`**
+- **`DELETE /api/interactions/events/{event_id}/attending?user_id=...`**
+
+### Trends (`/api/trends`)
+
+- **`GET /api/trends?region=san%20diego&skip=0&limit=50`**: ranked by interactions (attendance first, then comments, then likes)
+- **`POST /api/trends`**: rebuild trend list from current interactions
+- **`PUT /api/trends`**: upsert an event in trends and reorder
 
 ---
 

@@ -26,7 +26,7 @@ class Region(SQLModel, table=True):
     Table: regions — id, name (e.g. San Diego). Only id=0 (san diego) for now.
     """
 
-    __tablename__ = "regions"
+    __tablename__ = "regions"  # pyright: ignore[reportAssignmentType]
 
     # Primary key. In this project, region id 0 is reserved for San Diego (see `app.region_map`).
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -47,7 +47,7 @@ class User(SQLModel, table=True):
     First user gets id=0; then 1, 2, ... (id assigned in app).
     """
 
-    __tablename__ = "users"
+    __tablename__ = "users"  # pyright: ignore[reportAssignmentType]
 
     # Primary key. This app assigns user ids manually (see `app.repositories.user_repository.get_next_user_id`).
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -78,7 +78,7 @@ class Event(SQLModel, table=True):
     Table: events — id, region_id, user_id, title, content, created_at.
     """
 
-    __tablename__ = "events"
+    __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
 
     # Primary key.
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -107,7 +107,7 @@ class Event(SQLModel, table=True):
 class EventLike(SQLModel, table=True):
     """User liked an event. One row per (user_id, event_id)."""
 
-    __tablename__ = "event_likes"
+    __tablename__ = "event_likes"  # pyright: ignore[reportAssignmentType]
     # Enforce idempotency at the DB level: one like per (user, event).
     __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_event_like_user_event"),)
 
@@ -124,7 +124,7 @@ class EventLike(SQLModel, table=True):
 class EventComment(SQLModel, table=True):
     """User commented on an event."""
 
-    __tablename__ = "event_comments"
+    __tablename__ = "event_comments"  # pyright: ignore[reportAssignmentType]
 
     id: Optional[int] = Field(default=None, primary_key=True)
     # Author of the comment.
@@ -145,7 +145,7 @@ class EventComment(SQLModel, table=True):
 class EventAttending(SQLModel, table=True):
     """User is attending an event. One row per (user_id, event_id)."""
 
-    __tablename__ = "event_attending"
+    __tablename__ = "event_attending"  # pyright: ignore[reportAssignmentType]
     # Enforce idempotency at the DB level: one attendance record per (user, event).
     __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_event_attending_user_event"),)
 
@@ -162,7 +162,7 @@ class EventAttending(SQLModel, table=True):
 class Trend(SQLModel, table=True):
     """Cached trend list per region: event_id, rank, and snapshot counts. Order: 1st attendance, 2nd comments, 3rd likes."""
 
-    __tablename__ = "trends"
+    __tablename__ = "trends"  # pyright: ignore[reportAssignmentType]
     # Ensure an event appears at most once in a region's trend list.
     __table_args__ = (UniqueConstraint("region_id", "event_id", name="uq_trend_region_event"),)
 
