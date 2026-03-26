@@ -1,20 +1,20 @@
-"""User API: list, get, update (with password verification), delete.
+"""User API: list, get, update (with password verification).
 
-Registration is via POST /api/auth/register.
+Registration is via POST /api/auth/register. Deletion is via DELETE /api/auth/me.
 """
 
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import bad_request, conflict, not_found, unauthorized
 from app.auth import verify_password
 from app.database import get_db
+from app.exceptions import bad_request, conflict, not_found, unauthorized
 from app.models import User
-from app.region_map import city_location_to_region_id, region_id_to_city_location
+from app.region_map import region_id_to_city_location
+from app.repositories.region_repository import resolve_region_id_for_city_location
+from app.repositories.user_repository import get_user_by_id
 from app.repositories.user_repository import (
-    delete_user_and_events,
-    get_user_by_id,
     list_users as list_user_rows,
 )
 from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate
@@ -74,7 +74,9 @@ async def update_user(
         if payload.email is not None:
             user.email = payload.email.strip().lower()
         if payload.city_location is not None:
-            user.region_id = city_location_to_region_id(payload.city_location)
+            user.region_id = await resolve_region_id_for_city_location(
+                db, city_location=payload.city_location
+            )
         await db.flush()
         return SuccessResponse()
     except ValueError as e:
@@ -85,16 +87,3 @@ async def update_user(
         if "Duplicate" in msg or "UNIQUE" in msg or "1062" in msg:
             raise conflict("Email already in use") from e
         raise bad_request("Invalid request") from e
-
-
-@router.delete("/{id}", response_model=SuccessResponse)
-async def delete_user(
-    id: int = Path(..., description="User ID (the 'id' field from the user list)"),
-    db: AsyncSession = Depends(get_db),
-):
-    """Delete a user by ID. Any events owned by the user are deleted first."""
-    exists = await get_user_by_id(db, id)
-    if exists is None:
-        raise not_found("User not found")
-    await delete_user_and_events(db, id)
-    return SuccessResponse()

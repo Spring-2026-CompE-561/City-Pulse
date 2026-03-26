@@ -67,7 +67,10 @@ def parse_region_param(value: str | int) -> int:
     if isinstance(value, int):
         if value == REGION_SAN_DIEGO_ID:
             return value
-        raise ValueError(f"Unknown region id. Only {REGION_SAN_DIEGO_ID} (san diego) is supported.")
+        raise ValueError(
+            "Unknown region id. "
+            f"Only {REGION_SAN_DIEGO_ID} (san diego) is supported."
+        )
     # Normalize string input early for consistent comparisons.
     s = value.strip().lower()
     if s == "0":

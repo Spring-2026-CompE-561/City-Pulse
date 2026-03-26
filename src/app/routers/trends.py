@@ -1,23 +1,25 @@
 """Trends API: list most interacted events by region (read-only for users); POST rebuild list, PUT update with new event/order."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.region_map import parse_region_param
 from app.repositories.event_repository import get_event_by_id
 from app.repositories.trend_repository import (
     clear_region_trends,
     create_trend_row,
-    flush as flush_repo,
     get_event_interaction_counts_by_region,
     get_next_rank_for_region,
     get_trend_for_region_event,
     list_trends_for_region,
     list_trends_with_event_titles,
 )
-from app.region_map import parse_region_param
+from app.repositories.trend_repository import (
+    flush as flush_repo,
+)
 from app.schemas import SuccessResponse, TrendEntryRead, TrendRebuildBody, TrendUpdateBody
 
 router = APIRouter(prefix="/api/trends", tags=["Trends"])
@@ -76,7 +78,7 @@ async def rebuild_trends(
         key=_order_key,
     )
     await clear_region_trends(db, region_id=region_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for rank, (event_id, att, com, lik) in enumerate(sorted_events, start=1):
         await create_trend_row(
             db,
@@ -116,7 +118,7 @@ async def update_trends(
         trend_row.attendance_count = att
         trend_row.comments_count = com
         trend_row.likes_count = lik
-        trend_row.updated_at = datetime.now(timezone.utc)
+        trend_row.updated_at = datetime.now(UTC)
     else:
         next_rank = await get_next_rank_for_region(db, region_id=region_id)
         await create_trend_row(

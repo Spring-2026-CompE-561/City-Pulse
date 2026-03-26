@@ -43,6 +43,12 @@ class UserUpdate(BaseModel):
     city_location: str | None = Field(None, description="Only 'san diego' is supported.")
 
 
+class UserDeleteBody(BaseModel):
+    """Body for DELETE /api/users/{id}: password required to confirm deletion."""
+
+    password: str = Field(..., min_length=1, description="Your current password to confirm account deletion.")
+
+
 class UserRead(BaseModel):
     """User response: id, name, email, city_location (from region_id), created_at. Built in router, not from ORM."""
 

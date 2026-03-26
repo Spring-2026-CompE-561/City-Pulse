@@ -1,13 +1,15 @@
 """Register, login, and refresh tokens. Use access_token as Bearer for protected endpoints."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import decode_refresh_token, get_current_user
-from app.exceptions import bad_request, conflict, unauthorized
+from app.auth import decode_refresh_token, get_current_user, get_current_user_required, verify_password
 from app.database import get_db
-from app.schemas import LoginRequest, RefreshRequest, UserCreate, UserRead
+from app.exceptions import bad_request, conflict, unauthorized
+from app.models import User
+from app.repositories.user_repository import delete_user_and_events
+from app.schemas import LoginRequest, RefreshRequest, SuccessResponse, UserCreate, UserDeleteBody, UserRead
 from app.services.auth_service import (
     build_token_pair,
     is_duplicate_email_error,
@@ -35,6 +37,8 @@ async def register(
     try:
         return await register_user(db, payload)
     except ValueError as e:
+        if str(e) == "Email already registered":
+            raise conflict("Email already registered") from e
         raise bad_request(str(e)) from e
     except IntegrityError as e:
         await db.rollback()
@@ -92,3 +96,22 @@ async def me(user=Depends(get_current_user)):
     if user is None:
         raise unauthorized("Not authenticated")
     return UserRead(**user_to_public(user))
+
+
+@router.delete("/me", response_model=SuccessResponse)
+async def delete_me(
+    payload: UserDeleteBody = ...,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    **Delete your account.** Requires Bearer auth and password confirmation.
+
+    All events owned by the user are removed as well.
+
+    **Body:** `{ "password": "your_current_password" }`
+    """
+    if not verify_password(payload.password, current_user.password_hash):
+        raise unauthorized("Incorrect password")
+    await delete_user_and_events(db, current_user.id)
+    return SuccessResponse()

@@ -8,7 +8,7 @@ from app.auth import (
     verify_password,
 )
 from app.models import User
-from app.region_map import city_location_to_region_id
+from app.repositories.region_repository import resolve_region_id_for_city_location
 from app.repositories.user_repository import (
     create_user,
     get_next_user_id,
@@ -34,19 +34,33 @@ def build_token_pair(user_id: int) -> dict:
     }
 
 
+def require_user_id(user: User) -> int:
+    """Return a non-null user id or raise if missing."""
+    if user.id is None:
+        raise ValueError("User id is missing")
+    return user.id
+
+
 async def register_user(db: AsyncSession, payload: UserCreate) -> dict:
     """Register a new user and return an access/refresh token pair."""
-    region_id = city_location_to_region_id(payload.city_location)
+    email = payload.email.strip().lower()
+    existing_user = await get_user_by_email(db, email)
+    if existing_user is not None:
+        raise ValueError("Email already registered")
+
+    region_id = await resolve_region_id_for_city_location(
+        db, city_location=payload.city_location
+    )
     next_id = await get_next_user_id(db)
     user = await create_user(
         db,
         id=next_id,
         name=payload.name,
-        email=payload.email.strip().lower(),
+        email=email,
         password_hash=hash_password(payload.password),
         region_id=region_id,
     )
-    return build_token_pair(user.id)
+    return build_token_pair(require_user_id(user))
 
 
 async def login_user(db: AsyncSession, payload: LoginRequest) -> dict | None:
@@ -55,7 +69,7 @@ async def login_user(db: AsyncSession, payload: LoginRequest) -> dict | None:
     user = await get_user_by_email(db, email)
     if not user or not verify_password(payload.password, user.password_hash):
         return None
-    return build_token_pair(user.id)
+    return build_token_pair(require_user_id(user))
 
 
 def user_to_public(user: User) -> dict:
