@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,12 +29,11 @@ async def create_user(
         name=name,
         email=email,
         password_hash=password_hash,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         region_id=region_id,
     )
     db.add(user)
     await db.flush()
-    await db.refresh(user)
     return user
 
 

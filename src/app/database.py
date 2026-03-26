@@ -91,8 +91,25 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         # Create all tables for all SQLModel models (Region, User, Event, etc).
         await conn.run_sync(SQLModel.metadata.create_all)
-        # Insert the default region row if it doesn't exist (MySQL `INSERT IGNORE`).
-        await conn.execute(
-            text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
-            {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
+        # Ensure San Diego exists. Prefer id=0 for consistency, but don't create
+        # duplicates if older DBs already stored it under a different id.
+        existing = await conn.execute(
+            text(
+                "SELECT id FROM regions "
+                "WHERE LOWER(name) = LOWER(:name) "
+                "ORDER BY id LIMIT 1"
+            ),
+            {"name": "San Diego"},
         )
+        existing_id = existing.scalar_one_or_none()
+        if existing_id is None:
+            # MySQL treats 0 as AUTO_INCREMENT unless this mode is enabled.
+            await conn.execute(
+                text(
+                    "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO')"
+                )
+            )
+            await conn.execute(
+                text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
+                {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
+            )

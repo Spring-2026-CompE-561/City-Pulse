@@ -1,10 +1,12 @@
 """
-Authentication helpers: password hashing, access/refresh tokens, and FastAPI dependencies.
+Authentication helpers: password hashing, access/refresh tokens,
+and FastAPI dependencies.
 
 What lives here
 - Password hashing + verification helpers (`hash_password`, `verify_password`).
 - In-memory access/refresh token stores and helpers to create/decode them.
-- FastAPI dependency functions to retrieve the current user from a Bearer token.
+- FastAPI dependency functions to retrieve the current user from a
+  Bearer token.
 
 Called by / import relationships
 - `app.services.auth_service` imports:
@@ -16,7 +18,8 @@ Called by / import relationships
 - Other routers can depend on `get_current_user_required` to protect endpoints.
 
 Important behavior
-- Tokens are stored in process memory. If the server restarts, all issued tokens become invalid.
+- Tokens are stored in process memory. If the server restarts, all
+  issued tokens become invalid.
 """
 
 import hashlib
@@ -24,23 +27,24 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from app.config import settings
 from app.database import get_db
 from app.models import User
 
 # In-memory token stores: token -> (user_id, expires_at).
-# Used by: `decode_access_token` / `decode_refresh_token`.
-# Trade-off: simple for demos; not suitable for multi-instance deployments or restarts.
+# Trade-off: simple for demos; not suitable for multi-instance
+# deployments or restarts.
 _access_token_store: dict[str, tuple[int, datetime]] = {}
 _refresh_token_store: dict[str, tuple[int, datetime]] = {}
 
-# OAuth2PasswordBearer reads the Authorization: Bearer <token> header.
-# Used by: `get_current_user` dependency below.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
+# HTTPBearer gives Swagger a simple "Bearer token" paste field
+# instead of the OAuth2 username/password/client form.
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _hash_password(password: str) -> str:
@@ -59,7 +63,8 @@ def verify_password(plain: str, password_hash: str) -> bool:
 
     Called by
     - `app.services.auth_service.login_user`
-    - `app.routers.users.update_user` (verifies `current_password` before updates)
+    - `app.routers.users.update_user` (verifies `current_password`
+      before updates)
     """
     return _hash_password(plain) == password_hash
 
@@ -87,7 +92,9 @@ def create_access_token(user_id: int) -> str:
     # Random, URL-safe token string.
     token = secrets.token_urlsafe(32)
     # Compute expiration using configured TTL.
-    expires = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+    expires = datetime.now(UTC) + timedelta(
+        minutes=settings.access_token_expire_minutes
+    )
     # Persist in memory for later validation/lookup.
     _access_token_store[token] = (user_id, expires)
     return token
@@ -101,7 +108,9 @@ def create_refresh_token(user_id: int) -> str:
     - `app.services.auth_service.build_token_pair`
     """
     token = secrets.token_urlsafe(32)
-    expires = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+    expires = datetime.now(UTC) + timedelta(
+        days=settings.refresh_token_expire_days
+    )
     _refresh_token_store[token] = (user_id, expires)
     return token
 
@@ -145,14 +154,15 @@ def decode_refresh_token(token: str) -> dict | None:
 
 
 async def get_current_user(
-    token: str | None = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
     """
     FastAPI dependency: resolve the current user from a Bearer access token.
 
     Parameters
-    - `token`: automatically extracted from Authorization header by `oauth2_scheme`.
+    - `credentials`: automatically extracted from the Authorization header
+      by `bearer_scheme`.
     - `db`: an async DB session provided by `app.database.get_db`.
 
     Returns
@@ -162,8 +172,9 @@ async def get_current_user(
     Called by
     - `app.routers.auth.me` (and potentially other protected endpoints).
     """
-    if not token:
+    if not credentials:
         return None
+    token = credentials.credentials
     payload = decode_access_token(token)
     if not payload or "sub" not in payload:
         return None
@@ -171,17 +182,19 @@ async def get_current_user(
         user_id = int(payload["sub"])
     except (ValueError, TypeError):
         return None
-    # Look up the user row for the token subject.
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(col(User.id) == user_id))
     return result.scalar_one_or_none()
 
 
-async def get_current_user_required(user: User | None = Depends(get_current_user)) -> User:
+async def get_current_user_required(
+    user: User | None = Depends(get_current_user),
+) -> User:
     """
     FastAPI dependency: like `get_current_user` but enforces authentication.
 
     Called by
-    - Any router endpoint that wants to require a Bearer token. (Currently available for use.)
+    - Any router endpoint that wants to require a Bearer token.
+      (Currently available for use.)
     """
     if user is None:
         raise HTTPException(
