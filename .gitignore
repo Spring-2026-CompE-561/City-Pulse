@@ -3,4 +3,4 @@
 __pycache__/
 *.pyc
 .env*
-*.txt
+*.txt".env" 
