@@ -1,10 +1,10 @@
 """
-Authentication helpers: password hashing, access/refresh tokens,
+Authentication helpers: password hashing, JWT access/refresh tokens,
 and FastAPI dependencies.
 
 What lives here
 - Password hashing + verification helpers (`hash_password`, `verify_password`).
-- In-memory access/refresh token stores and helpers to create/decode them.
+- JWT access/refresh token helpers to create/decode token pairs.
 - FastAPI dependency functions to retrieve the current user from a
   Bearer token.
 
@@ -18,14 +18,13 @@ Called by / import relationships
 - Other routers can depend on `get_current_user_required` to protect endpoints.
 
 Important behavior
-- Tokens are stored in process memory. If the server restarts, all
-  issued tokens become invalid.
+- Tokens are signed JWTs. Validation checks signature, expiry, and token type.
 """
 
 import hashlib
-import secrets
 from datetime import UTC, datetime, timedelta
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
@@ -35,12 +34,6 @@ from sqlmodel import col
 from app.config import settings
 from app.database import get_db
 from app.models import User
-
-# In-memory token stores: token -> (user_id, expires_at).
-# Trade-off: simple for demos; not suitable for multi-instance
-# deployments or restarts.
-_access_token_store: dict[str, tuple[int, datetime]] = {}
-_refresh_token_store: dict[str, tuple[int, datetime]] = {}
 
 # HTTPBearer gives Swagger a simple "Bearer token" paste field
 # instead of the OAuth2 username/password/client form.
@@ -81,38 +74,49 @@ def hash_password(plain: str) -> str:
 
 def create_access_token(user_id: int) -> str:
     """
-    Create and store a new short-lived access token for `user_id`.
+    Create a signed short-lived JWT access token for `user_id`.
 
     Called by
     - `app.services.auth_service.build_token_pair`
 
     Returns
-    - A random URL-safe string that the client sends as a Bearer token.
+    - A signed JWT string that the client sends as a Bearer token.
     """
-    # Random, URL-safe token string.
-    token = secrets.token_urlsafe(32)
-    # Compute expiration using configured TTL.
-    expires = datetime.now(UTC) + timedelta(
-        minutes=settings.access_token_expire_minutes
+    now = datetime.now(UTC)
+    expires = now + timedelta(minutes=settings.access_token_expire_minutes)
+    payload = {
+        "sub": str(user_id),
+        "type": "access",
+        "iat": int(now.timestamp()),
+        "exp": int(expires.timestamp()),
+    }
+    return jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
     )
-    # Persist in memory for later validation/lookup.
-    _access_token_store[token] = (user_id, expires)
-    return token
 
 
 def create_refresh_token(user_id: int) -> str:
     """
-    Create and store a new long-lived refresh token for `user_id`.
+    Create a signed long-lived JWT refresh token for `user_id`.
 
     Called by
     - `app.services.auth_service.build_token_pair`
     """
-    token = secrets.token_urlsafe(32)
-    expires = datetime.now(UTC) + timedelta(
-        days=settings.refresh_token_expire_days
+    now = datetime.now(UTC)
+    expires = now + timedelta(days=settings.refresh_token_expire_days)
+    payload = {
+        "sub": str(user_id),
+        "type": "refresh",
+        "iat": int(now.timestamp()),
+        "exp": int(expires.timestamp()),
+    }
+    return jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
     )
-    _refresh_token_store[token] = (user_id, expires)
-    return token
 
 
 def decode_access_token(token: str) -> dict | None:
@@ -120,20 +124,27 @@ def decode_access_token(token: str) -> dict | None:
     Validate an access token and return its payload, or None.
 
     Returns
-    - `{"sub": "<user_id_as_str>"}` if token exists and is not expired.
-    - None if token is missing, unknown, or expired.
+    - `{"sub": "<user_id_as_str>"}` if token is valid and not expired.
+    - None if token is missing, invalid, wrong type, or expired.
 
     Called by
     - `get_current_user` dependency below.
     """
-    if not token or token not in _access_token_store:
+    if not token:
         return None
-    user_id, expires = _access_token_store[token]
-    if datetime.now(UTC) >= expires:
-        # Clean up expired token to prevent unbounded growth.
-        del _access_token_store[token]
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.InvalidTokenError:
         return None
-    return {"sub": str(user_id)}
+    if payload.get("type") != "access":
+        return None
+    if "sub" not in payload:
+        return None
+    return {"sub": str(payload["sub"])}
 
 
 def decode_refresh_token(token: str) -> dict | None:
@@ -143,14 +154,21 @@ def decode_refresh_token(token: str) -> dict | None:
     Called by
     - `app.routers.auth.refresh` to mint a new access token.
     """
-    if not token or token not in _refresh_token_store:
+    if not token:
         return None
-    user_id, expires = _refresh_token_store[token]
-    if datetime.now(UTC) >= expires:
-        # Clean up expired token to prevent unbounded growth.
-        del _refresh_token_store[token]
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.InvalidTokenError:
         return None
-    return {"sub": str(user_id)}
+    if payload.get("type") != "refresh":
+        return None
+    if "sub" not in payload:
+        return None
+    return {"sub": str(payload["sub"])}
 
 
 async def get_current_user(

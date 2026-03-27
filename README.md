@@ -112,6 +112,9 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 | `DEBUG`        | `false`      | If true, returns more detailed 500 errors and enables verbose debugging. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token expiry (minutes). |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token expiry (days). |
+| `JWT_SECRET_KEY` | `change-me-in-production` | Secret key used to sign and verify JWT access/refresh tokens. |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
+| `CORS_ALLOW_ORIGINS` | `*` | `*` or comma-separated allowed origins for CORS. |
 
 **Startup behavior**: on app startup it creates tables (if missing) and seeds the default region data.
 

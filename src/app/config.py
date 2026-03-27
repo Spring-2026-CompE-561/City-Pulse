@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # Token lifetimes (used by `app.auth` when minting tokens).
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
+    # JWT signing configuration.
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    # CORS configuration.
+    cors_allow_origins: str = "*"
 
     @model_validator(mode="after")
     def set_database_url(self) -> "Settings":
@@ -79,6 +84,21 @@ class Settings(BaseSettings):
                 f"{self.mysql_database}?charset=utf8mb4"
             )
         return self
+
+    def cors_allow_origins_list(self) -> list[str]:
+        """
+        Return CORS origins as a normalized list.
+
+        Supports either:
+        - "*" (allow all), or
+        - Comma-separated origins, e.g. "http://localhost:3000,https://example.com".
+        """
+        raw = self.cors_allow_origins.strip()
+        if not raw:
+            return ["*"]
+        if raw == "*":
+            return ["*"]
+        return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 # Singleton settings object used throughout the backend.
