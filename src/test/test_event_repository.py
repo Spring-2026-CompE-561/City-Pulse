@@ -17,6 +17,7 @@ async def test_create_event_adds_and_flushes_session():
         region_id=0,
         user_id=1,
         title="Test event",
+        category="Technology",
         content="hello",
     )
 
@@ -29,9 +30,21 @@ async def test_create_event_adds_and_flushes_session():
 @pytest.mark.asyncio
 async def test_update_event_fields_only_updates_given_values():
     db = AsyncMock()
-    event = Event(region_id=0, user_id=1, title="Old", content="Old content")
+    event = Event(
+        region_id=0,
+        user_id=1,
+        title="Old",
+        category="Business",
+        content="Old content",
+    )
 
-    await update_event_fields(db, event=event, title="New", content=None)
+    await update_event_fields(
+        db,
+        event=event,
+        title="New",
+        category=None,
+        content=None,
+    )
 
     assert event.title == "New"
     assert event.content == "Old content"

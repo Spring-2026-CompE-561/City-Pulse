@@ -74,7 +74,7 @@ class User(SQLModel, table=True):
 class Event(SQLModel, table=True):
     """
     Event model. A post in a region (and optionally by a user).
-    Table: events — id, region_id, user_id, title, content, created_at.
+    Table: events — id, region_id, user_id, title, category, content, created_at.
     """
 
     __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
@@ -87,6 +87,8 @@ class Event(SQLModel, table=True):
     user_id: int | None = Field(default=None, foreign_key="users.id", index=True)
     # Title is required and bounded in length by schema.
     title: str = Field(nullable=False, max_length=512)
+    # Category is required and validated in `app.event_categories`.
+    category: str = Field(default="Technology", nullable=False, max_length=100, index=True)
     # Optional body/content.
     content: str | None = Field(default=None)
     # Server-side creation timestamp.

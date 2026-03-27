@@ -91,6 +91,17 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         # Create all tables for all SQLModel models (Region, User, Event, etc).
         await conn.run_sync(SQLModel.metadata.create_all)
+        # Backfill schema for older databases created before event category existed.
+        event_category_column = await conn.execute(
+            text("SHOW COLUMNS FROM events LIKE 'category'")
+        )
+        if event_category_column.first() is None:
+            await conn.execute(
+                text(
+                    "ALTER TABLE events "
+                    "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Technology'"
+                )
+            )
         # Ensure San Diego exists. Prefer id=0 for consistency, but don't create
         # duplicates if older DBs already stored it under a different id.
         existing = await conn.execute(

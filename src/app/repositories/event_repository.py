@@ -8,11 +8,12 @@ from app.models import Event
 
 
 async def list_events_by_region(
-    db: AsyncSession, *, region_id: int, skip: int, limit: int
+    db: AsyncSession, *, region_id: int, skip: int, limit: int, category: str | None = None
 ) -> list[Event]:
-    result = await db.execute(
-        select(Event).where(col(Event.region_id) == region_id).offset(skip).limit(limit)
-    )
+    query = select(Event).where(col(Event.region_id) == region_id)
+    if category is not None:
+        query = query.where(col(Event.category) == category)
+    result = await db.execute(query.offset(skip).limit(limit))
     return list(result.scalars().all())
 
 
@@ -21,12 +22,13 @@ async def get_event_by_id(db: AsyncSession, event_id: int) -> Event | None:
 
 
 async def create_event(
-    db: AsyncSession, *, region_id: int, user_id: int, title: str, content: str | None
+    db: AsyncSession, *, region_id: int, user_id: int, title: str, category: str, content: str | None
 ) -> Event:
     event = Event(
         region_id=region_id,
         user_id=user_id,
         title=title,
+        category=category,
         content=content,
         created_at=datetime.now(UTC),
     )
@@ -37,10 +39,12 @@ async def create_event(
 
 
 async def update_event_fields(
-    db: AsyncSession, *, event: Event, title: str | None, content: str | None
+    db: AsyncSession, *, event: Event, title: str | None, category: str | None, content: str | None
 ) -> None:
     if title is not None:
         event.title = title
+    if category is not None:
+        event.category = category
     if content is not None:
         event.content = content
     await db.flush()
