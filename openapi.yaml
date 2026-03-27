@@ -500,7 +500,7 @@ paths:
   # ---------------------------------------------------------------------------
   /api/trends:
     get:
-      summary: Get most interacted events in a region (by rank: attendance, comments, likes)
+      summary: "Get most interacted events in a region (by rank: attendance, comments, likes)"
       tags: [Trends]
       parameters:
         - name: region

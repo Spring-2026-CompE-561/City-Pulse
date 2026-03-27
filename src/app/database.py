@@ -1,27 +1,44 @@
-"""Database configuration and session management."""
+"""
+Database configuration and session management (MySQL).
+
+What lives here
+- The async SQLAlchemy engine used by SQLModel/SQLAlchemy for all DB I/O.
+- An async session factory (`async_session_maker`) used to create per-request sessions.
+- FastAPI dependencies:
+  - `get_db()` yields an `AsyncSession` and commits/rolls back automatically.
+- Startup helper:
+  - `init_db()` creates tables and seeds the default region row.
+
+Called by / import relationships
+- `app.main.lifespan()` calls `init_db()` during application startup.
+- Routers/services import `get_db` and use it via `Depends(get_db)` for DB access.
+- `settings` (DB URL + debug) come from `app.config`.
+"""
 
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import event, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
 
 from app.config import settings
-from app.models import Base
 from app.region_map import REGION_SAN_DIEGO_ID
 
+# Resolved URL is set by the `Settings` validator (MySQL). Kept module-private on purpose.
+# Used by: `create_async_engine(...)` below.
+_database_url: str = settings.database_url or ""
+
+# The global async engine shared across the app process.
+# Used by: `async_sessionmaker(...)` to create request sessions.
 engine = create_async_engine(
-    settings.database_url,
+    _database_url,
     echo=settings.debug,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
 )
 
-if "sqlite" in settings.database_url:
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _sqlite_fk_pragma(dbapi_connection, _connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON")
-        cursor.close()
-
+# Session factory used by `get_db()` to create an `AsyncSession` per request.
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -32,73 +49,78 @@ async_session_maker = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency that yields an async database session."""
+    """
+    FastAPI dependency that yields an async database session.
+
+    How it behaves
+    - Opens a session for the request.
+    - Yields it to the route handler / service code.
+    - If the request finishes successfully, commits the transaction.
+    - If an exception occurs, rolls back and re-raises.
+    - Always closes the session.
+
+    Called by
+    - Routers and dependencies via `Depends(get_db)`.
+    """
     async with async_session_maker() as session:
         try:
+            # The caller uses this session for all ORM queries/flushes.
             yield session
+            # If no exception was raised, persist changes.
             await session.commit()
         except Exception:
+            # On any error, undo partial work for this request.
             await session.rollback()
             raise
         finally:
+            # Always release DB connections back to the pool.
             await session.close()
 
 
-async def _ensure_users_region_id(conn) -> None:
-    """Add region_id to users table if missing (migration for existing DBs)."""
-    if "sqlite" not in str(engine.url):
-        return
-    result = await conn.execute(text("PRAGMA table_info(users)"))
-    rows = result.all()
-    if not rows:
-        return
-    columns = [row[1] for row in rows]
-    if "region_id" in columns:
-        return
-    await conn.execute(text("ALTER TABLE users ADD COLUMN region_id INTEGER REFERENCES regions(id)"))
-
-
-async def _ensure_users_name_column(conn) -> None:
-    """Add name column to users if missing (old DBs had display_name). Copy display_name -> name."""
-    if "sqlite" not in str(engine.url):
-        return
-    result = await conn.execute(text("PRAGMA table_info(users)"))
-    rows = result.all()
-    if not rows:
-        return
-    columns = [row[1] for row in rows]
-    if "name" in columns:
-        return
-    await conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR(255)"))
-    if "display_name" in columns:
-        await conn.execute(text("UPDATE users SET name = COALESCE(display_name, '') WHERE name IS NULL"))
-
-
-async def _ensure_trend_count_columns(conn) -> None:
-    """Add attendance_count, comments_count, likes_count to trends if missing."""
-    if "sqlite" not in str(engine.url):
-        return
-    result = await conn.execute(text("PRAGMA table_info(trends)"))
-    rows = result.all()
-    if not rows:
-        return
-    columns = [row[1] for row in rows]
-    if "attendance_count" not in columns:
-        await conn.execute(text("ALTER TABLE trends ADD COLUMN attendance_count INTEGER NOT NULL DEFAULT 0"))
-    if "comments_count" not in columns:
-        await conn.execute(text("ALTER TABLE trends ADD COLUMN comments_count INTEGER NOT NULL DEFAULT 0"))
-    if "likes_count" not in columns:
-        await conn.execute(text("ALTER TABLE trends ADD COLUMN likes_count INTEGER NOT NULL DEFAULT 0"))
-
-
 async def init_db() -> None:
-    """Create all tables, migrate if needed, and seed San Diego region (id=0) if missing."""
+    """
+    Initialize database schema and seed required data.
+
+    What it does
+    - Creates all tables defined in `SQLModel.metadata` (models imported in `app.main`).
+    - Inserts the default Region row for San Diego (id=0) if missing.
+
+    Called by
+    - `app.main.lifespan()` during application startup.
+    """
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await _ensure_users_region_id(conn)
-        await _ensure_users_name_column(conn)
-        await _ensure_trend_count_columns(conn)
-        await conn.execute(
-            text("INSERT OR IGNORE INTO regions (id, name) VALUES (:id, :name)"),
-            {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
+        # Create all tables for all SQLModel models (Region, User, Event, etc).
+        await conn.run_sync(SQLModel.metadata.create_all)
+        # Backfill schema for older databases created before event category existed.
+        event_category_column = await conn.execute(
+            text("SHOW COLUMNS FROM events LIKE 'category'")
         )
+        if event_category_column.first() is None:
+            await conn.execute(
+                text(
+                    "ALTER TABLE events "
+                    "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Technology'"
+                )
+            )
+        # Ensure San Diego exists. Prefer id=0 for consistency, but don't create
+        # duplicates if older DBs already stored it under a different id.
+        existing = await conn.execute(
+            text(
+                "SELECT id FROM regions "
+                "WHERE LOWER(name) = LOWER(:name) "
+                "ORDER BY id LIMIT 1"
+            ),
+            {"name": "San Diego"},
+        )
+        existing_id = existing.scalar_one_or_none()
+        if existing_id is None:
+            # MySQL treats 0 as AUTO_INCREMENT unless this mode is enabled.
+            await conn.execute(
+                text(
+                    "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO')"
+                )
+            )
+            await conn.execute(
+                text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
+                {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
+            )

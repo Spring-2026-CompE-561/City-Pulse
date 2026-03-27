@@ -8,10 +8,13 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "sqlalchemy[asyncio]>=2.0.0",
+    "sqlmodel>=0.0.32",
     "greenlet>=3.0.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "aiosqlite>=0.20.0",
+    "asyncmy>=0.2.9",
+    "cryptography>=42.0.0",
+    "PyJWT>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +40,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4"]
+ignore = ["B008", "E501"]
 
 [tool.black]
 line-length = 100
@@ -45,3 +49,8 @@ target-version = ["py311"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["src/test"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src"]
