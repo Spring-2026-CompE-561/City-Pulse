@@ -44,17 +44,17 @@ class Settings(BaseSettings):
     debug: bool = False
     # Use `DATABASE_URL` for a full URL, or set `MYSQL_*` to build a MySQL URL.
     database_url: str | None = None
-    mysql_host: str = "localhost"
-    mysql_port: int = 3306
-    mysql_user: str = "ulises"
-    mysql_password: str = "Lilacw@v2020"
-    mysql_database: str = "city_pulse"
+    mysql_host: str | None = None
+    mysql_port: int | None = None
+    mysql_user: str | None = None
+    mysql_password: str | None = None
+    mysql_database: str | None = None
 
     # Token lifetimes (used by `app.auth` when minting tokens).
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
     # JWT signing configuration.
-    jwt_secret_key: str = "change-me-in-production-at-least-32-bytes"
+    jwt_secret_key: str | None = None
     jwt_algorithm: str = "HS256"
     # CORS configuration.
     cors_allow_origins: str = "*"
@@ -72,6 +72,24 @@ class Settings(BaseSettings):
           the engine.
         """
         if self.database_url is None or self.database_url == "":
+            required_mysql_parts = {
+                "MYSQL_HOST": self.mysql_host,
+                "MYSQL_PORT": self.mysql_port,
+                "MYSQL_USER": self.mysql_user,
+                "MYSQL_PASSWORD": self.mysql_password,
+                "MYSQL_DATABASE": self.mysql_database,
+            }
+            missing = [
+                key for key, value in required_mysql_parts.items()
+                if value is None or value == ""
+            ]
+            if missing:
+                missing_csv = ", ".join(missing)
+                raise ValueError(
+                    "Missing database configuration. Set DATABASE_URL, "
+                    f"or provide all MYSQL_* values. Missing: {missing_csv}"
+                )
+
             # Build MySQL URL from components.
             # Password is URL-encoded to handle special characters safely.
             from urllib.parse import quote_plus
@@ -83,6 +101,11 @@ class Settings(BaseSettings):
                 f"@{self.mysql_host}:{self.mysql_port}/"
                 f"{self.mysql_database}?charset=utf8mb4"
             )
+        if self.jwt_secret_key is None or self.jwt_secret_key == "":
+            raise ValueError(
+                "Missing JWT configuration. Set JWT_SECRET_KEY in the environment."
+            )
+
         return self
 
     def cors_allow_origins_list(self) -> list[str]:
