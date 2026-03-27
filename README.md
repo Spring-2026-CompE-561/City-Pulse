@@ -168,8 +168,10 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 ### Events (`/api/events`)
 
 - **`GET /api/events?region=san%20diego&skip=0&limit=50`**
+- **`GET /api/events?region=san%20diego&category=All%20Categories&skip=0&limit=50`**
+- **`GET /api/events/categories`**: dropdown options (`All Categories`, `Technology`, `Arts & Culture`, `Environment`, `Entertainment`, `Business`, `Food & Drink`, `Health & Wellness`, `Music`)
 - **`GET /api/events/{id}`**
-- **`POST /api/events`**: create event for a user (user must be in the San Diego region)
+- **`POST /api/events`**: create event for a user (user must be in the San Diego region) with required `category`
 - **`PUT /api/events/{id}`**
 - **`DELETE /api/events/{id}`**
 

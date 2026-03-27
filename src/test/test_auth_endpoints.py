@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 import app.main as app_main_module
 from app.main import app
-from app.routers import auth as auth_router_module
+from app.routes import auth as auth_router_module
 
 
 async def _fake_get_db():

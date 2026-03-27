@@ -14,8 +14,11 @@ Called by / import relationships
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.event_categories import ALL_CATEGORIES_OPTION
 
 
 # ----- User -----
@@ -96,19 +99,39 @@ class RegionRead(BaseModel):
 
 # ----- Event (matches Event model: id, region_id, user_id, title, content, created_at) -----
 class EventCreate(BaseModel):
-    """Body for POST /api/events/: user_id, title, content. Region comes from user."""
+    """Body for POST /api/events/: user_id, title, category, content. Region comes from user."""
 
     # Author user id; router validates that user exists and is in San Diego.
     user_id: int = Field(..., description="User posting the event (must have city_location = san diego).")
     title: str = Field(..., min_length=1, max_length=512)
+    category: Literal[
+        "Technology",
+        "Arts & Culture",
+        "Environment",
+        "Entertainment",
+        "Business",
+        "Food & Drink",
+        "Health & Wellness",
+        "Music",
+    ] = Field(..., description="Category selected from the frontend dropdown options.")
     content: str | None = Field(None, max_length=10000)
 
 
 class EventUpdate(BaseModel):
-    """Body for PUT /api/events/{id}: optional title and/or content."""
+    """Body for PUT /api/events/{id}: optional title/category/content."""
 
     # Partial update fields; router only updates provided values.
     title: str | None = Field(None, min_length=1, max_length=512)
+    category: Literal[
+        "Technology",
+        "Arts & Culture",
+        "Environment",
+        "Entertainment",
+        "Business",
+        "Food & Drink",
+        "Health & Wellness",
+        "Music",
+    ] | None = Field(None, description="Updated category from the frontend dropdown options.")
     content: str | None = None
 
 
@@ -122,8 +145,27 @@ class EventRead(BaseModel):
     region_id: int
     user_id: int | None
     title: str
+    category: str
     content: str | None
     created_at: datetime
+
+
+class EventCategoryOptionsResponse(BaseModel):
+    """Allowed category values for frontend dropdown menus."""
+
+    options: list[str] = Field(
+        default_factory=lambda: [
+            ALL_CATEGORIES_OPTION,
+            "Technology",
+            "Arts & Culture",
+            "Environment",
+            "Entertainment",
+            "Business",
+            "Food & Drink",
+            "Health & Wellness",
+            "Music",
+        ]
+    )
 
 
 # ----- Trend (read-only for users; system maintains list) -----
@@ -176,6 +218,7 @@ class EventWithInteractionsRead(BaseModel):
     region_id: int
     user_id: int | None
     title: str
+    category: str
     content: str | None
     created_at: datetime
     likes_count: int = 0

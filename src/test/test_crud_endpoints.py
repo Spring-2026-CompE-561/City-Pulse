@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 import app.main as app_main_module
 from app.main import app
 from app.models import Event, User
-from app.routers import events as events_router_module
-from app.routers import users as users_router_module
+from app.routes import events as events_router_module
+from app.routes import users as users_router_module
 
 
 async def _fake_get_db():
@@ -48,13 +48,14 @@ def test_list_users_endpoint(monkeypatch):
 
 
 def test_list_events_endpoint(monkeypatch):
-    async def _fake_list_events(_db, region_id, skip, limit):
+    async def _fake_list_events(_db, region_id, skip, limit, category=None):
         return [
             Event(
                 id=10,
                 region_id=region_id,
                 user_id=1,
                 title="Picnic",
+                category="Food & Drink",
                 content="Sunday",
                 created_at=datetime.now(UTC),
             )
@@ -68,4 +69,22 @@ def test_list_events_endpoint(monkeypatch):
     items = response.json()
     assert len(items) == 1
     assert items[0]["title"] == "Picnic"
+    assert items[0]["category"] == "Food & Drink"
+
+
+def test_list_event_categories_endpoint(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.get("/api/events/categories")
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    options = response.json()["options"]
+    assert "All Categories" in options
+    assert "Technology" in options
+
+
+def test_list_events_rejects_invalid_category(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.get("/api/events?category=UnknownCategory")
+    app.dependency_overrides.clear()
+    assert response.status_code == 400
 
