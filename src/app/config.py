@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
     # JWT signing configuration.
-    jwt_secret_key: str = "change-me-in-production"
+    jwt_secret_key: str = "change-me-in-production-at-least-32-bytes"
     jwt_algorithm: str = "HS256"
     # CORS configuration.
     cors_allow_origins: str = "*"

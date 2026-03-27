@@ -21,9 +21,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.v1.routes import api_router
 from app.config import settings
 from app.database import init_db
-from app.routers import auth, events, interactions, regions, trends, users
 
 logger = logging.getLogger("app.request")
 
@@ -88,13 +88,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount each feature router under its prefix (declared inside each router module).
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(regions.router)
-app.include_router(events.router)
-app.include_router(trends.router)
-app.include_router(interactions.router)
+# Mount all API v1 routes.
+app.include_router(api_router)
 
 
 @app.middleware("http")

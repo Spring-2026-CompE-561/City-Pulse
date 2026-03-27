@@ -21,30 +21,40 @@ Location-based events + trends platform (backend API). Users can register/login,
 
 ```
 City-Pulse/
-├── pyproject.toml        # Project config, dependencies, tools
-├── .pre-commit-config.yml # Pre-commit hooks (Ruff, Black)
-├── .vscode/
-│   └── settings.json     # Python interpreter & analysis path
+├── pyproject.toml
+├── requirements.txt
+├── README.md
+├── postman/
+│   └── City-Pulse.postman_collection.json
 └── src/
-    ├── app/              # Main application package
-    │   ├── __init__.py   # Exposes app
-    │   ├── main.py       # FastAPI app, lifespan, routers
-    │   ├── config.py     # Settings (env / .env)
-    │   ├── database.py   # Async engine, session, init_db
-    │   ├── models.py     # SQLModel models (User, Region, Event, interactions, Trend)
-    │   ├── schemas.py    # Pydantic request/response schemas
-    │   ├── auth.py       # JWT helpers, current user dependency
-    │   ├── services/     # Service-layer helpers (auth, etc.)
-    │   ├── region_map.py # San Diego-only mapping helpers
-    │   └── routers/      # API route modules
-    │       ├── auth.py
-    │       ├── users.py
-    │       ├── regions.py
-    │       ├── events.py
-    │       ├── trends.py
-    │       └── interactions.py
+    ├── app/
+    │   ├── __init__.py
+    │   ├── main.py
+    │   ├── api/
+    │   │   └── v1/
+    │   │       ├── __init__.py
+    │   │       └── routes.py
+    │   ├── core/
+    │   │   ├── __init__.py
+    │   │   ├── auth.py
+    │   │   ├── database.py
+    │   │   ├── dependencies.py
+    │   │   └── settings.py
+    │   ├── routes/
+    │   ├── repository/
+    │   ├── routers/
+    │   ├── repositories/
+    │   ├── auth.py
+    │   ├── config.py
+    │   ├── database.py
+    │   ├── models.py
+    │   ├── schemas.py
+    │   └── services/
     └── test/
-        └── main.py       # Tests
+        ├── test_auth_endpoints.py
+        ├── test_auth_tokens.py
+        ├── test_crud_endpoints.py
+        └── test_event_repository.py
 ```
 
 ---
@@ -64,6 +74,7 @@ City-Pulse/
 
    ```bash
    pip install -e .
+   pip install -r requirements.txt
    ```
 
 3. **Configure environment** (MySQL):
@@ -83,6 +94,12 @@ City-Pulse/
    - API root: `http://127.0.0.1:8000/`
    - Swagger UI: `http://127.0.0.1:8000/docs`
    - OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
+
+6. **Run tests**:
+
+   ```bash
+   pytest
+   ```
 
 ---
 
@@ -112,7 +129,7 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 | `DEBUG`        | `false`      | If true, returns more detailed 500 errors and enables verbose debugging. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token expiry (minutes). |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token expiry (days). |
-| `JWT_SECRET_KEY` | `change-me-in-production` | Secret key used to sign and verify JWT access/refresh tokens. |
+| `JWT_SECRET_KEY` | `change-me-in-production-at-least-32-bytes` | Secret key used to sign and verify JWT access/refresh tokens. |
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
 | `CORS_ALLOW_ORIGINS` | `*` | `*` or comma-separated allowed origins for CORS. |
 
@@ -171,6 +188,14 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 - **`GET /api/trends?region=san%20diego&skip=0&limit=50`**: ranked by interactions (attendance first, then comments, then likes)
 - **`POST /api/trends`**: rebuild trend list from current interactions
 - **`PUT /api/trends`**: upsert an event in trends and reorder
+
+---
+
+## Postman testing
+
+- Import `postman/City-Pulse.postman_collection.json`.
+- Set `base_url` to your local API URL.
+- Run the auth flow (`Register` -> `Login` -> `Get Current User`) and use Swagger for the remaining CRUD endpoints.
 
 ---
 
