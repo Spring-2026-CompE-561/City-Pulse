@@ -13,14 +13,19 @@ Called by / import relationships
 - `init_db()` comes from `app.database` and is invoked during application startup.
 """
 
+import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import init_db
 from app.routers import auth, events, interactions, regions, trends, users
+
+logger = logging.getLogger("app.request")
 
 
 @asynccontextmanager
@@ -75,6 +80,14 @@ app = FastAPI(
     ],
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins_list(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Mount each feature router under its prefix (declared inside each router module).
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -82,6 +95,26 @@ app.include_router(regions.router)
 app.include_router(events.router)
 app.include_router(trends.router)
 app.include_router(interactions.router)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """
+    Request logging middleware.
+
+    Logs method, path, status, and request duration for each HTTP call.
+    """
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    logger.info(
+        "%s %s -> %s (%.2f ms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
 
 
 @app.exception_handler(Exception)
