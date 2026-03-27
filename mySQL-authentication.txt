@@ -1,0 +1,5 @@
+mySQL
+
+user admin: ulises (local machine)
+
+password: Lilacw@v2020
