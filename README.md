@@ -197,7 +197,17 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 
 - Import `postman/City-Pulse.postman_collection.json`.
 - Set `base_url` to your local API URL.
-- Run the auth flow (`Register` -> `Login` -> `Get Current User`) and use Swagger for the remaining CRUD endpoints.
+- Run the auth flow (`Register` -> `Login` -> `Get Current User`).
+- Run `List Event Categories`, `List Events (All Categories)`, and `List Events (Invalid Category - expect 400)` to verify validation and graceful error handling.
+- Use Swagger for the remaining CRUD endpoints.
+
+---
+
+## Submission checklist
+
+- Include `README.md`, `pyproject.toml`, and `requirements.txt`.
+- Ensure tests pass locally with `pytest`.
+- Package the project as a `.zip` from the repository root for submission.
 
 ---
 

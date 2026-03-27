@@ -98,6 +98,86 @@
           ]
         }
       }
+    },
+    {
+      "name": "List Events (All Categories)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/events?region=san%20diego&category=All%20Categories&skip=0&limit=50",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "events"
+          ],
+          "query": [
+            {
+              "key": "region",
+              "value": "san diego"
+            },
+            {
+              "key": "category",
+              "value": "All Categories"
+            },
+            {
+              "key": "skip",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Events (Invalid Category - expect 400)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/events?region=san%20diego&category=UnknownCategory",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "events"
+          ],
+          "query": [
+            {
+              "key": "region",
+              "value": "san diego"
+            },
+            {
+              "key": "category",
+              "value": "UnknownCategory"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Event Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/events/categories",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "events",
+            "categories"
+          ]
+        }
+      }
     }
   ],
   "variable": [
