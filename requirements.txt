@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+sqlmodel
+greenlet
+pydantic
+pydantic-settings
+asyncmy
+cryptography
+PyJWT
+pytest
+pytest-asyncio
+httpx
+
