@@ -6,6 +6,15 @@ __pycache__/
 .env.*
 *.env
 
+# Database files and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.dmp
+*.bak
+
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
 mySQL-authentication.txt

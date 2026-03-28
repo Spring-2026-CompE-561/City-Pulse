@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -37,7 +37,7 @@ async def test_update_event_fields_only_updates_given_values():
         title="Old",
         category="Business",
         content="Old content",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
     await update_event_fields(
