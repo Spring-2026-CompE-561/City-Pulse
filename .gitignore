@@ -5,3 +5,7 @@ __pycache__/
 .env
 .env.*
 *.env
+
+ADDITIONAL_CONSIDERATIONS.txt
+API_PARAMETERS.txt
+mySQL-authentication.txt
