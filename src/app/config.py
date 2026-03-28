@@ -16,9 +16,10 @@ Called by / import relationships
   `app.database`.
 """
 
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROOT_ENV_FILE = PROJECT_ROOT / ".env"
