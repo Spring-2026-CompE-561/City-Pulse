@@ -2,5 +2,10 @@
 .vscode/
 __pycache__/
 *.pyc
-.env*
-*.txt
+.env
+.env.*
+*.env
+
+ADDITIONAL_CONSIDERATIONS.txt
+API_PARAMETERS.txt
+mySQL-authentication.txt

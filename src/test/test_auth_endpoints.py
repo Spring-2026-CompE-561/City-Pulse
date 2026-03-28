@@ -13,6 +13,7 @@ from app.routes import auth as auth_router_module
 async def _fake_get_db():
     yield AsyncMock()
     
+
 #Setting up the test cliet
 #We are monkeypatching the init_db so the app doesnot try to connect to anything on startup
 def _build_client(monkeypatch) -> TestClient:
