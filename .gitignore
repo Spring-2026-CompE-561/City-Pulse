@@ -5,6 +5,10 @@ __pycache__/
 .env
 .env.*
 *.env
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
 
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
