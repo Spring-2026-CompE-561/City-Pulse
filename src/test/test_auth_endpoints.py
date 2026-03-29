@@ -12,6 +12,7 @@ from app.routes import auth as auth_router_module
 #We just yield a mock object becase we donot want tests hitting a real DB
 async def _fake_get_db():
     yield AsyncMock()
+    
 
 #Setting up the test cliet
 #We are monkeypatching the init_db so the app doesnot try to connect to anything on startup
