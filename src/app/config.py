@@ -16,8 +16,13 @@ Called by / import relationships
   `app.database`.
 """
 
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ROOT_ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -35,7 +40,7 @@ class Settings(BaseSettings):
     # - load from `.env` if present
     # - ignore extra/unknown environment variables
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(ROOT_ENV_FILE), ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

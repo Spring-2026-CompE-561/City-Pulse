@@ -37,9 +37,7 @@ from app.repositories.interaction_repository import (
 from app.schemas import (
     CommentRead,
     EventWithInteractionsRead,
-    InteractionAttendingBody,
     InteractionCommentBody,
-    InteractionLikeBody,
     SuccessResponse,
 )
 
@@ -89,22 +87,19 @@ async def list_events_with_interactions(
 @router.put("/events/{event_id}/likes", response_model=SuccessResponse)
 async def add_like(
     event_id: int = Path(..., description="Event ID"),
-    payload: InteractionLikeBody = Body(...),
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a like from a user to an event (idempotent: already liked is success)."""
+    """Add a like to an event as the authenticated user (idempotent)."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
-    if payload.user_id != current_user.id:
-        raise forbidden("Cannot add a like for another user")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    existing = await get_like(db, event_id=event_id, user_id=payload.user_id)
+    existing = await get_like(db, event_id=event_id, user_id=current_user.id)
     if existing:
         return SuccessResponse()
-    await add_like_row(db, event_id=event_id, user_id=payload.user_id)
+    await add_like_row(db, event_id=event_id, user_id=current_user.id)
     return SuccessResponse()
 
 
@@ -115,18 +110,16 @@ async def add_comment(
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a comment from a user to an event."""
+    """Add a comment to an event as the authenticated user."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
-    if payload.user_id != current_user.id:
-        raise forbidden("Cannot add a comment for another user")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     comment = await add_comment_row(
         db,
         event_id=event_id,
-        user_id=payload.user_id,
+        user_id=current_user.id,
         text=payload.text,
     )
     return comment
@@ -135,41 +128,35 @@ async def add_comment(
 @router.put("/events/{event_id}/attending", response_model=SuccessResponse)
 async def add_attending(
     event_id: int = Path(..., description="Event ID"),
-    payload: InteractionAttendingBody = Body(...),
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add attendance: user marks they are attending the event (idempotent)."""
+    """Mark attendance for an event as the authenticated user (idempotent)."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
-    if payload.user_id != current_user.id:
-        raise forbidden("Cannot add attendance for another user")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    existing = await get_attending(db, event_id=event_id, user_id=payload.user_id)
+    existing = await get_attending(db, event_id=event_id, user_id=current_user.id)
     if existing:
         return SuccessResponse()
-    await add_attending_row(db, event_id=event_id, user_id=payload.user_id)
+    await add_attending_row(db, event_id=event_id, user_id=current_user.id)
     return SuccessResponse()
 
 
 @router.delete("/events/{event_id}/likes", response_model=SuccessResponse)
 async def remove_like(
     event_id: int = Path(..., description="Event ID"),
-    user_id: int = Query(..., description="User whose like to remove"),
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a like from an event you own."""
+    """Remove your own like from an event."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.user_id != current_user.id:
-        raise forbidden("Cannot remove interactions from another user's event")
-    like = await get_like(db, event_id=event_id, user_id=user_id)
+    like = await get_like(db, event_id=event_id, user_id=current_user.id)
     if not like:
         raise HTTPException(status_code=404, detail="Like not found")
     await remove_like_row(db, like=like)
@@ -183,17 +170,17 @@ async def remove_comment(
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a comment from an event you own."""
+    """Remove your own comment from an event."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.user_id != current_user.id:
-        raise forbidden("Cannot remove interactions from another user's event")
     comment = await get_comment_by_id(db, comment_id=comment_id)
     if not comment or comment.event_id != event_id:
         raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.user_id != current_user.id:
+        raise forbidden("Cannot remove another user's comment")
     await remove_comment_row(db, comment=comment)
     return SuccessResponse()
 
@@ -201,19 +188,16 @@ async def remove_comment(
 @router.delete("/events/{event_id}/attending", response_model=SuccessResponse)
 async def remove_attending(
     event_id: int = Path(..., description="Event ID"),
-    user_id: int = Query(..., description="User whose attendance to remove"),
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove an attendance record from an event you own."""
+    """Remove your own attendance record from an event."""
     if current_user.id is None:
         raise RuntimeError("User id missing from database record")
     event = await get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.user_id != current_user.id:
-        raise forbidden("Cannot remove interactions from another user's event")
-    attending = await get_attending(db, event_id=event_id, user_id=user_id)
+    attending = await get_attending(db, event_id=event_id, user_id=current_user.id)
     if not attending:
         raise HTTPException(status_code=404, detail="Attendance record not found")
     await remove_attending_row(db, attending=attending)

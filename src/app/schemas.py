@@ -231,22 +231,17 @@ class EventWithInteractionsRead(BaseModel):
 
 
 class InteractionLikeBody(BaseModel):
-    """Body for PUT like: user adds a like to an event."""
-
-    user_id: int = Field(..., description="User who is liking the event")
+    """Deprecated body for PUT like; user identity comes from auth token."""
 
 
 class InteractionCommentBody(BaseModel):
-    """Body for PUT comment: user adds a comment to an event."""
+    """Body for PUT comment: authenticated user comments on an event."""
 
-    user_id: int = Field(..., description="User who is commenting")
     text: str = Field(..., min_length=1, max_length=5000)
 
 
 class InteractionAttendingBody(BaseModel):
-    """Body for PUT attending: user marks they are attending an event."""
-
-    user_id: int = Field(..., description="User who is attending")
+    """Deprecated body for PUT attending; user identity comes from auth token."""
 
 
 class InteractionRemoveBody(BaseModel):
