@@ -16,12 +16,15 @@ Called by / import relationships
 """
 
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
 from app.config import settings
+from app.ingestion.source_registry import build_default_sources
+from app.models import Source
 from app.region_map import REGION_SAN_DIEGO_ID
 
 # Resolved URL is set by the `Settings` validator (MySQL). Kept module-private on purpose.
@@ -124,3 +127,71 @@ async def init_db() -> None:
                 text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
                 {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
             )
+        await _run_sql_migrations(conn)
+
+    async with async_session_maker() as session:
+        await _seed_default_sources(session)
+        await session.commit()
+
+
+async def _run_sql_migrations(conn) -> None:
+    migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
+    if not migrations_dir.exists():
+        return
+    await conn.execute(
+        text(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "id VARCHAR(255) PRIMARY KEY,"
+            "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )
+    )
+    existing_rows = await conn.execute(text("SELECT id FROM schema_migrations"))
+    applied = {row[0] for row in existing_rows.all()}
+    for path in sorted(migrations_dir.glob("*.sql")):
+        migration_id = path.name
+        if migration_id in applied:
+            continue
+        sql = path.read_text(encoding="utf-8").strip()
+        if not sql:
+            await conn.execute(
+                text("INSERT INTO schema_migrations (id) VALUES (:id)"),
+                {"id": migration_id},
+            )
+            continue
+        statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+        for statement in statements:
+            await conn.execute(text(statement))
+        await conn.execute(
+            text("INSERT INTO schema_migrations (id) VALUES (:id)"),
+            {"id": migration_id},
+        )
+
+
+async def _seed_default_sources(session: AsyncSession) -> None:
+    existing_count = await session.execute(
+        text("SELECT COUNT(*) FROM sources WHERE region_id = :region_id"),
+        {"region_id": REGION_SAN_DIEGO_ID},
+    )
+    if int(existing_count.scalar() or 0) > 0:
+        return
+    for source in build_default_sources():
+        session.add(
+            Source(
+                region_id=source.region_id,
+                name=source.name,
+                domain=source.domain,
+                base_url=source.base_url,
+                source_type=source.source_type,
+                category_hint=source.category_hint,
+                neighborhood=source.neighborhood,
+                is_active=source.is_active,
+                crawl_allowed=source.crawl_allowed,
+                crawl_delay_seconds=source.crawl_delay_seconds,
+                rate_limit_per_min=source.rate_limit_per_min,
+                attribution_text=source.attribution_text,
+                robots_txt_url=source.robots_txt_url,
+                terms_url=source.terms_url,
+                parse_strategy=source.parse_strategy,
+            )
+        )

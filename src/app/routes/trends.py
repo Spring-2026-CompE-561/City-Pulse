@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import require_ingest_api_key
 from app.database import get_db
 from app.region_map import parse_region_param
 from app.repositories.event_repository import get_event_by_id
@@ -61,6 +62,7 @@ async def get_trends(
 @router.post("/", status_code=201)
 async def rebuild_trends(
     payload: TrendRebuildBody,
+    _auth: None = Depends(require_ingest_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Build a new trend list for the region from current interaction counts. Order: 1st attendance, 2nd comments, 3rd likes."""
@@ -97,6 +99,7 @@ async def rebuild_trends(
 @router.put("/", response_model=SuccessResponse)
 async def update_trends(
     payload: TrendUpdateBody,
+    _auth: None = Depends(require_ingest_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """Add or update an event in the trend list for the region, then reorder by interactions (attendance, comments, likes)."""

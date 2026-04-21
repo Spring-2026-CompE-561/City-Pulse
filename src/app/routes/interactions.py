@@ -1,5 +1,7 @@
 """Interactions API: list events with interactions; add/remove likes, comments, attending."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +36,7 @@ from app.repositories.interaction_repository import (
 from app.repositories.interaction_repository import (
     remove_like as remove_like_row,
 )
+from app.repositories.source_repository import get_source_by_id
 from app.schemas import (
     CommentRead,
     EventWithInteractionsRead,
@@ -47,6 +50,10 @@ router = APIRouter(prefix="/api/interactions", tags=["Interactions"])
 @router.get("/", response_model=list[EventWithInteractionsRead])
 async def list_events_with_interactions(
     region: str | int = Query("san diego", description="Region: 'san diego' or 0"),
+    category: str | None = Query(None, description="Optional category filter."),
+    neighborhood: str | None = Query(None, description="Optional neighborhood filter."),
+    starts_after: str | None = Query(None, description="ISO datetime lower bound."),
+    starts_before: str | None = Query(None, description="ISO datetime upper bound."),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -56,7 +63,28 @@ async def list_events_with_interactions(
         region_id = parse_region_param(region)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    events = await list_events_by_region(db, region_id=region_id, skip=skip, limit=limit)
+    parsed_starts_after = None
+    if starts_after:
+        try:
+            parsed_starts_after = datetime.fromisoformat(starts_after.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid starts_after datetime format") from exc
+    parsed_starts_before = None
+    if starts_before:
+        try:
+            parsed_starts_before = datetime.fromisoformat(starts_before.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid starts_before datetime format") from exc
+    events = await list_events_by_region(
+        db,
+        region_id=region_id,
+        skip=skip,
+        limit=limit,
+        category=category,
+        neighborhood=neighborhood,
+        starts_after=parsed_starts_after,
+        starts_before=parsed_starts_before,
+    )
     out = []
     for ev in events:
         if ev.id is None:
@@ -66,6 +94,10 @@ async def list_events_with_interactions(
             db, event_id=event_id
         )
         comments = await list_comments_for_event(db, event_id=event_id)
+        source_name = None
+        if ev.source_id is not None:
+            source = await get_source_by_id(db, ev.source_id)
+            source_name = source.name if source is not None else None
         out.append(
             EventWithInteractionsRead(
                 id=event_id,
@@ -74,6 +106,22 @@ async def list_events_with_interactions(
                 title=ev.title,
                 category=ev.category,
                 content=ev.content,
+                source_id=ev.source_id,
+                source_name=source_name,
+                origin_type=ev.origin_type,
+                external_url=ev.external_url,
+                canonical_url=ev.canonical_url,
+                event_start_at=ev.event_start_at,
+                event_end_at=ev.event_end_at,
+                timezone=ev.timezone,
+                venue_name=ev.venue_name,
+                venue_address=ev.venue_address,
+                neighborhood=ev.neighborhood,
+                city=ev.city,
+                price_info=ev.price_info,
+                promo_summary=ev.promo_summary,
+                source_confidence=ev.source_confidence,
+                last_seen_at=ev.last_seen_at,
                 created_at=ev.created_at,
                 likes_count=likes_value,
                 comments_count=comments_value,

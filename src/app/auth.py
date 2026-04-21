@@ -25,7 +25,7 @@ import hashlib
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -221,3 +221,19 @@ async def get_current_user_required(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def require_ingest_api_key(x_ingest_key: str | None = Header(default=None)) -> None:
+    """
+    Require a configured ingest API key for ingestion/admin endpoints.
+    """
+    if not settings.ingest_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ingestion key is not configured",
+        )
+    if x_ingest_key != settings.ingest_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid ingestion key",
+        )

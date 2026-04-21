@@ -1,5 +1,7 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Body, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +47,9 @@ async def list_events(
     ),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    neighborhood: str | None = Query(None, description="Optional neighborhood filter."),
+    starts_after: datetime | None = Query(None, description="Filter events starting at/after this datetime."),
+    starts_before: datetime | None = Query(None, description="Filter events starting at/before this datetime."),
     db: AsyncSession = Depends(get_db),
 ):
     """List events. Defaults to San Diego if no region given. Supports category filtering."""
@@ -57,6 +62,9 @@ async def list_events(
         db,
         region_id=region_id,
         category=category_filter,
+        neighborhood=neighborhood,
+        starts_after=starts_after,
+        starts_before=starts_before,
         skip=skip,
         limit=limit,
     )
@@ -108,6 +116,13 @@ async def create_event(
         title=payload.title,
         category=validate_event_category(payload.category),
         content=payload.content,
+        event_start_at=payload.event_start_at,
+        event_end_at=payload.event_end_at,
+        timezone=payload.timezone,
+        venue_name=payload.venue_name,
+        venue_address=payload.venue_address,
+        neighborhood=payload.neighborhood,
+        price_info=payload.price_info,
     )
     return event
 
@@ -137,6 +152,13 @@ async def update_event(
         title=payload.title,
         category=normalized_category,
         content=payload.content,
+        event_start_at=payload.event_start_at,
+        event_end_at=payload.event_end_at,
+        timezone=payload.timezone,
+        venue_name=payload.venue_name,
+        venue_address=payload.venue_address,
+        neighborhood=payload.neighborhood,
+        price_info=payload.price_info,
     )
     return SuccessResponse()
 

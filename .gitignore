@@ -18,3 +18,4 @@ __pycache__/
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
 mySQL-authentication.txt
+frontend/node_modules/

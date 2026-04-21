@@ -1,6 +1,6 @@
 # City Pulse
 
-Location-based events + trends platform (backend API). Users can register/login, create events (currently **San Diego only**), interact (likes/comments/attending), and view a ranked “trending” list driven by interactions.
+Location-based events + trends platform (backend API). Users can register/login, create events (currently **San Diego only**), interact (likes/comments/attending), and view a ranked “trending” list driven by interactions. The platform now supports source-based ingestion for nightlife/music listings and official-only partner submissions for public/charity/flea events.
 
 ---
 
@@ -132,6 +132,9 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 | `JWT_SECRET_KEY` | `change-me-in-production-at-least-32-bytes` | Secret key used to sign and verify JWT access/refresh tokens. |
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
 | `CORS_ALLOW_ORIGINS` | `*` | `*` or comma-separated allowed origins for CORS. |
+| `INGEST_API_KEY` | *(required for admin ingestion endpoints)* | Header `X-Ingest-Key` value for source/ingest moderation routes. |
+| `INGEST_SCHEDULER_ENABLED` | `false` | Enables periodic ingestion in app process. |
+| `INGEST_SCHEDULER_INTERVAL_MINUTES` | `60` | Scheduler interval, minimum 5 minutes. |
 
 **Startup behavior**: on app startup it creates tables (if missing) and seeds the default region data.
 
@@ -168,16 +171,16 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 ### Events (`/api/events`)
 
 - **`GET /api/events?region=san%20diego&skip=0&limit=50`**
-- **`GET /api/events?region=san%20diego&category=All%20Categories&skip=0&limit=50`**
-- **`GET /api/events/categories`**: dropdown options (`All Categories`, `Technology`, `Arts & Culture`, `Environment`, `Entertainment`, `Business`, `Food & Drink`, `Health & Wellness`, `Music`)
+- **`GET /api/events?region=san%20diego&category=All%20Categories&neighborhood=North%20Park&starts_after=2026-04-21T00:00:00Z&skip=0&limit=50`**
+- **`GET /api/events/categories`**: dropdown options (`All Categories`, `Technology`, `Arts & Culture`, `Environment`, `Entertainment`, `Business`, `Food & Drink`, `Health & Wellness`, `Music`, `Nightlife`, `Charity & Causes`, `Community`)
 - **`GET /api/events/{id}`**
-- **`POST /api/events`**: create event for a user (user must be in the San Diego region) with required `category`
+- **`POST /api/events`**: create event for a user (user must be in the San Diego region) with optional event metadata (`event_start_at`, `venue_name`, `neighborhood`, `price_info`, etc.)
 - **`PUT /api/events/{id}`**
 - **`DELETE /api/events/{id}`**
 
 ### Interactions (`/api/interactions`)
 
-- **`GET /api/interactions?region=san%20diego&skip=0&limit=50`**: returns events with likes/comments/attendance counts + comment list
+- **`GET /api/interactions?region=san%20diego&category=Nightlife&neighborhood=Gaslamp&starts_after=...&skip=0&limit=50`**: returns events with likes/comments/attendance counts + comment list
 - **`PUT /api/interactions/events/{event_id}/likes`**
 - **`DELETE /api/interactions/events/{event_id}/likes?user_id=...`**
 - **`PUT /api/interactions/events/{event_id}/comments`**
@@ -188,8 +191,34 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 ### Trends (`/api/trends`)
 
 - **`GET /api/trends?region=san%20diego&skip=0&limit=50`**: ranked by interactions (attendance first, then comments, then likes)
-- **`POST /api/trends`**: rebuild trend list from current interactions
-- **`PUT /api/trends`**: upsert an event in trends and reorder
+- **`POST /api/trends`**: rebuild trend list from current interactions (**requires `X-Ingest-Key`**)
+- **`PUT /api/trends`**: upsert an event in trends and reorder (**requires `X-Ingest-Key`**)
+
+### Sources (`/api/sources`)
+
+- **`GET /api/sources`**: list active configured sources (requires `X-Ingest-Key`)
+- **`GET /api/sources/{source_id}`**: source details (requires `X-Ingest-Key`)
+
+### Ingestion (`/api/ingest`)
+
+- **`POST /api/ingest/run`**: run ingestion for one source or filtered area (requires `X-Ingest-Key`)
+- **`POST /api/ingest/run-all`**: run ingestion for all active sources (requires `X-Ingest-Key`)
+- **`GET /api/ingest/runs`**: recent ingestion runs and parser errors (requires `X-Ingest-Key`)
+
+### Partner submissions (`/api/partner-submissions`)
+
+- **`POST /api/partner-submissions`**: authenticated submission path for Instagram/public event links (official-only workflow)
+- **`GET /api/partner-submissions`**: moderation queue view (requires `X-Ingest-Key`)
+- **`PUT /api/partner-submissions/{submission_id}/review`**: approve/reject and optionally publish event (requires `X-Ingest-Key`)
+
+---
+
+## Ingestion and migration workflow
+
+- SQL migrations live in `src/migrations/*.sql`.
+- On startup, `init_db()` creates `schema_migrations` and applies new SQL scripts once.
+- Default San Diego nightlife/music source records are seeded when no sources exist.
+- Compliance rules are documented in `SCRAPING_POLICY.md`.
 
 ---
 
