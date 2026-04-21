@@ -19,7 +19,7 @@ export const EditProfileDialog = forwardRef<HTMLDivElement, EditProfileDialogPro
     const user = getCurrentUser();
     const [formData, setFormData] = useState({
       name: user?.name || '',
-      location: user?.location || '',
+      city_location: user?.city_location || '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -32,7 +32,7 @@ export const EditProfileDialog = forwardRef<HTMLDivElement, EditProfileDialogPro
         return;
       }
 
-      if (!formData.location) {
+      if (!formData.city_location) {
         toast.error('Please select a location');
         return;
       }
@@ -41,7 +41,7 @@ export const EditProfileDialog = forwardRef<HTMLDivElement, EditProfileDialogPro
       const updatedUser = {
         ...user,
         name: formData.name,
-        location: formData.location,
+        city_location: formData.city_location,
       };
 
       setCurrentUser(updatedUser);
@@ -76,8 +76,8 @@ export const EditProfileDialog = forwardRef<HTMLDivElement, EditProfileDialogPro
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Select
-                value={formData.location}
-                onValueChange={(value) => setFormData({ ...formData, location: value })}
+                value={formData.city_location}
+                onValueChange={(value) => setFormData({ ...formData, city_location: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select your location" />

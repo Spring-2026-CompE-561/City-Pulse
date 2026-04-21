@@ -2,6 +2,7 @@ import type { AppSession, UserRead } from './contracts';
 
 const STORAGE_KEY = 'citypulse_session';
 const PROFILE_OVERRIDES_KEY = 'citypulse_profile_overrides';
+const CUSTOM_EVENTS_KEY = 'citypulse_custom_events';
 
 export interface ProfileOverride {
   displayName: string;
@@ -134,4 +135,46 @@ export function setProfileOverride(userId: number, override: ProfileOverride): v
   const allOverrides = getProfileOverridesData();
   allOverrides[String(userId)] = override;
   saveProfileOverridesData(allOverrides);
+}
+
+type CustomEventRecord = {
+  id: string;
+  [key: string]: unknown;
+};
+
+function getCustomEventsData(): CustomEventRecord[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_EVENTS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as CustomEventRecord[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((event) => typeof event?.id === 'string');
+  } catch (error) {
+    console.error('Error reading custom events from localStorage:', error);
+    return [];
+  }
+}
+
+function saveCustomEventsData(data: CustomEventRecord[]): void {
+  try {
+    localStorage.setItem(CUSTOM_EVENTS_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error writing custom events to localStorage:', error);
+  }
+}
+
+export function updateCustomEvent(event: { id: string }): void {
+  const nextEvent = event as CustomEventRecord;
+  const customEvents = getCustomEventsData();
+  const existingIndex = customEvents.findIndex((entry) => entry.id === nextEvent.id);
+  if (existingIndex === -1) {
+    customEvents.push(nextEvent);
+  } else {
+    customEvents[existingIndex] = nextEvent;
+  }
+  saveCustomEventsData(customEvents);
 }
