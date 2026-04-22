@@ -14,6 +14,7 @@ Called by / import relationships
 """
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, UniqueConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
@@ -133,7 +134,7 @@ class Event(SQLModel, table=True):
     # ORM relationships.
     region: Region = Relationship(back_populates="events")
     user: User | None = Relationship(back_populates="events")
-    source: "Source" | None = Relationship(back_populates="events")
+    source: Optional["Source"] = Relationship(back_populates="events")
     likes: list["EventLike"] = Relationship(back_populates="event")
     comments: list["EventComment"] = Relationship(back_populates="event")
     attending: list["EventAttending"] = Relationship(back_populates="event")

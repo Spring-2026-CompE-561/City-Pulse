@@ -17,9 +17,10 @@ Called by / import relationships
 
 from collections.abc import AsyncGenerator
 from pathlib import Path
+import re
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
 from app.config import settings
@@ -161,11 +162,110 @@ async def _run_sql_migrations(conn) -> None:
             continue
         statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
         for statement in statements:
-            await conn.execute(text(statement))
+            await _execute_migration_statement(conn, statement)
         await conn.execute(
             text("INSERT INTO schema_migrations (id) VALUES (:id)"),
             {"id": migration_id},
         )
+
+
+async def _execute_migration_statement(conn: AsyncConnection, statement: str) -> None:
+    column_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD COLUMN\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s+",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if column_match is not None:
+        table_name, column_name = column_match.group(1), column_match.group(2)
+        if await _column_exists(conn, table_name, column_name):
+            return
+        await conn.execute(text(_strip_if_not_exists(statement)))
+        return
+
+    index_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD INDEX\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s*\(",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if index_match is not None:
+        table_name, index_name = index_match.group(1), index_match.group(2)
+        if await _index_exists(conn, table_name, index_name):
+            return
+        await conn.execute(text(_strip_if_not_exists(statement)))
+        return
+
+    constraint_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD CONSTRAINT\s+`?(\w+)`?\s+",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if constraint_match is not None:
+        table_name, constraint_name = constraint_match.group(1), constraint_match.group(2)
+        if await _constraint_exists(conn, table_name, constraint_name):
+            return
+
+    canonical_url_unique_match = re.search(
+        r"ALTER TABLE\s+`?events`?\s+ADD CONSTRAINT\s+`?uq_event_canonical_url`?\s+"
+        r"UNIQUE\s*\(\s*`?canonical_url`?\s*\)",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if canonical_url_unique_match is not None:
+        if await _index_exists(conn, "events", "uq_event_canonical_url"):
+            return
+        # utf8mb4 + long VARCHAR can exceed key-size limits for full-length UNIQUE indexes.
+        await conn.execute(
+            text("CREATE UNIQUE INDEX uq_event_canonical_url ON events (canonical_url(512))")
+        )
+        return
+
+    await conn.execute(text(statement))
+
+
+def _strip_if_not_exists(statement: str) -> str:
+    return re.sub(r"\s+IF\s+NOT\s+EXISTS", "", statement, count=1, flags=re.IGNORECASE)
+
+
+async def _column_exists(conn: AsyncConnection, table_name: str, column_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND column_name = :column_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "column_name": column_name},
+    )
+    return result.first() is not None
+
+
+async def _index_exists(conn: AsyncConnection, table_name: str, index_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND index_name = :index_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "index_name": index_name},
+    )
+    return result.first() is not None
+
+
+async def _constraint_exists(conn: AsyncConnection, table_name: str, constraint_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.table_constraints "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND constraint_name = :constraint_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "constraint_name": constraint_name},
+    )
+    return result.first() is not None
 
 
 async def _seed_default_sources(session: AsyncSession) -> None:
