@@ -30,7 +30,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       const currentUser = await getMe(tokenPair.access_token);
       setSession({
         accessToken: tokenPair.access_token,
-        refreshToken: tokenPair.refresh_token,
+        refreshToken: tokenPair.refresh_token ?? null,
         currentUser,
       });
       toast.success(`Welcome back, ${currentUser.name}!`);
@@ -56,7 +56,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       const currentUser = await getMe(tokenPair.access_token);
       setSession({
         accessToken: tokenPair.access_token,
-        refreshToken: tokenPair.refresh_token,
+        refreshToken: tokenPair.refresh_token ?? null,
         currentUser,
       });
       toast.success(`Account created! Welcome, ${currentUser.name}!`);

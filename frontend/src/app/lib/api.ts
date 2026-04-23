@@ -12,7 +12,13 @@ import type {
   TrendEntryRead,
   UserRead,
 } from './contracts';
-import { getAccessToken } from './storage';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from './storage';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -21,10 +27,110 @@ interface RequestOptions extends RequestInit {
   authToken?: string;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+class ApiRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
+export function isAuthError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 401;
+}
+
+async function parse_error_message(response: Response): Promise<string> {
+  let message = `Request failed (${response.status})`;
+  try {
+    const payload = (await response.json()) as { detail?: string };
+    if (typeof payload?.detail === 'string') {
+      message = payload.detail;
+    }
+  } catch {
+    // Keep fallback message when body cannot be parsed.
+  }
+  return message;
+}
+
+function parse_refreshed_token(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const tokenValue = (payload as { access_token?: unknown; accessToken?: unknown }).access_token
+    ?? (payload as { access_token?: unknown; accessToken?: unknown }).accessToken;
+  return typeof tokenValue === 'string' && tokenValue.trim() ? tokenValue : null;
+}
+
+function parse_refresh_fallback_token(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const refreshValue = (payload as { refresh_token?: unknown; refreshToken?: unknown }).refresh_token
+    ?? (payload as { refresh_token?: unknown; refreshToken?: unknown }).refreshToken;
+  return typeof refreshValue === 'string' && refreshValue.trim() ? refreshValue : null;
+}
+
+async function try_refresh_with_options(path: string, init: RequestInit): Promise<string | null> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const payload = response.status === 204 ? null : ((await response.json()) as unknown);
+  const nextAccessToken = parse_refreshed_token(payload);
+  if (!nextAccessToken) {
+    return null;
+  }
+  setAccessToken(nextAccessToken);
+  const nextRefreshToken = parse_refresh_fallback_token(payload);
+  if (nextRefreshToken) {
+    setRefreshToken(nextRefreshToken);
+  }
+  return nextAccessToken;
+}
+
+async function refresh_access_token(): Promise<string | null> {
+  const refreshPaths = ['/api/auth/refresh', '/api/auth/refresh-token'];
+
+  for (const path of refreshPaths) {
+    const cookieRefreshToken = await try_refresh_with_options(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (cookieRefreshToken) {
+      return cookieRefreshToken;
+    }
+  }
+
+  const fallbackRefreshToken = getRefreshToken();
+  if (!fallbackRefreshToken) {
+    return null;
+  }
+
+  for (const path of refreshPaths) {
+    const bodyRefreshToken = await try_refresh_with_options(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: fallbackRefreshToken }),
+    });
+    if (bodyRefreshToken) {
+      return bodyRefreshToken;
+    }
+  }
+
+  return null;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, alreadyRetried = false): Promise<T> {
   const { auth = false, authToken, headers, ...rest } = options;
   const nextHeaders = new Headers(headers ?? {});
-  nextHeaders.set('Content-Type', 'application/json');
+  if (rest.body && !nextHeaders.has('Content-Type')) {
+    nextHeaders.set('Content-Type', 'application/json');
+  }
   if (auth) {
     const token = authToken ?? getAccessToken();
     if (token) {
@@ -35,19 +141,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers: nextHeaders,
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    let message = `Request failed (${response.status})`;
-    try {
-      const payload = await response.json();
-      if (typeof payload?.detail === 'string') {
-        message = payload.detail;
+    if (auth && response.status === 401 && !alreadyRetried) {
+      const refreshedAccessToken = await refresh_access_token();
+      if (refreshedAccessToken) {
+        return request<T>(
+          path,
+          {
+            ...options,
+            authToken: refreshedAccessToken,
+          },
+          true
+        );
       }
-    } catch {
-      // Keep fallback message when body cannot be parsed.
+      clearAuthTokens();
+      throw new ApiRequestError('Session expired. Please sign in again.', 401);
     }
-    throw new Error(message);
+    throw new ApiRequestError(await parse_error_message(response), response.status);
   }
 
   if (response.status === 204) {

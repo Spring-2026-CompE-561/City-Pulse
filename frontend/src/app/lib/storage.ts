@@ -21,7 +21,7 @@ export function getStorageData(): AppSession | null {
       return defaultSession();
     }
     const parsed = JSON.parse(raw) as AppSession;
-    if (!parsed?.accessToken || !parsed?.refreshToken || !parsed?.currentUser) {
+    if (!parsed?.accessToken || !parsed?.currentUser) {
       return defaultSession();
     }
     if (!Array.isArray(parsed.attendingEventIds)) {
@@ -46,12 +46,14 @@ export function saveStorageData(data: AppSession | null): void {
   }
 }
 
-export function setSession(payload: { accessToken: string; refreshToken: string; currentUser: UserRead }): void {
+export function setSession(payload: { accessToken: string; refreshToken?: string | null; currentUser: UserRead }): void {
+  const existingSession = getStorageData();
   saveStorageData({
     accessToken: payload.accessToken,
     refreshToken: payload.refreshToken,
     currentUser: payload.currentUser,
-    attendingEventIds: [],
+    attendingEventIds:
+      existingSession?.currentUser.id === payload.currentUser.id ? existingSession.attendingEventIds : [],
   });
 }
 
@@ -63,8 +65,42 @@ export function getAccessToken(): string | null {
   return getStorageData()?.accessToken ?? null;
 }
 
+export function getRefreshToken(): string | null {
+  return getStorageData()?.refreshToken ?? null;
+}
+
 export function getCurrentUser(): UserRead | null {
   return getStorageData()?.currentUser ?? null;
+}
+
+export function hasValidSession(): boolean {
+  return getStorageData() !== null;
+}
+
+export function setAccessToken(accessToken: string): void {
+  const session = getStorageData();
+  if (!session) {
+    return;
+  }
+  saveStorageData({
+    ...session,
+    accessToken,
+  });
+}
+
+export function setRefreshToken(refreshToken: string | null): void {
+  const session = getStorageData();
+  if (!session) {
+    return;
+  }
+  saveStorageData({
+    ...session,
+    refreshToken,
+  });
+}
+
+export function clearAuthTokens(): void {
+  clearSession();
 }
 
 export function setCurrentUser(user: UserRead | null): void {

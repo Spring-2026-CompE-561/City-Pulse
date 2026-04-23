@@ -4,10 +4,11 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
-import { getMe, listEventsWithInteractions } from '../lib/api';
+import { getMe, isAuthError, listEventsWithInteractions } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
-import { getCurrentUser, getProfileOverride, getStorageData, setCurrentUser } from '../lib/storage';
+import { clearSession, getCurrentUser, getProfileOverride, getStorageData, setCurrentUser } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, TrendingUp, Check } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -17,12 +18,16 @@ export function Profile() {
   const [displayName, setDisplayName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
   const [bio, setBio] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     const loadProfile = async () => {
       const currentUser = getCurrentUser();
       if (!currentUser) {
+        if (isMounted) {
+          setLoading(false);
+        }
         navigate('/');
         return;
       }
@@ -53,8 +58,18 @@ export function Profile() {
         setProfilePicture(latestOverride?.avatarUrl || '');
         setBio(latestOverride?.bio || '');
         setEvents(interactions);
-      } catch {
-        // Keep locally cached user/session values if refresh fails.
+      } catch (error) {
+        if (isAuthError(error)) {
+          clearSession();
+          toast.error(error.message);
+          navigate('/');
+          return;
+        }
+        // Keep locally cached user/session values if non-auth refresh fails.
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     loadProfile();
@@ -62,6 +77,14 @@ export function Profile() {
       isMounted = false;
     };
   }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Loading your profile...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return null;

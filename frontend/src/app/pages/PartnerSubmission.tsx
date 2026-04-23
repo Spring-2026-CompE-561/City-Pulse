@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, Send } from 'lucide-react';
 
@@ -8,13 +8,15 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
-import { submitPartnerEvent } from '../lib/api';
-import { getCurrentUser } from '../lib/storage';
+import { isAuthError, submitPartnerEvent } from '../lib/api';
+import type { UserRead } from '../lib/contracts';
+import { clearSession, getCurrentUser } from '../lib/storage';
 import { toast } from 'sonner';
 
 export function PartnerSubmission() {
   const navigate = useNavigate();
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<UserRead | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     organizer_name: '',
@@ -32,10 +34,16 @@ export function PartnerSubmission() {
     event_end_at: '',
   });
 
-  if (!currentUser) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    const sessionUser = getCurrentUser();
+    if (!sessionUser) {
+      setAuthChecked(true);
+      navigate('/');
+      return;
+    }
+    setCurrentUser(sessionUser);
+    setAuthChecked(true);
+  }, [navigate]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -49,6 +57,11 @@ export function PartnerSubmission() {
     }
     setSubmitting(true);
     try {
+      if (!currentUser) {
+        toast.error('Please sign in to submit an event');
+        navigate('/');
+        return;
+      }
       await submitPartnerEvent({
         ...formData,
         organizer_contact: formData.organizer_contact || undefined,
@@ -69,11 +82,29 @@ export function PartnerSubmission() {
       toast.success('Submission received and queued for moderation.');
       navigate('/feed');
     } catch (error) {
+      if (isAuthError(error)) {
+        clearSession();
+        toast.error(error.message);
+        navigate('/');
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to submit event');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Checking your session...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

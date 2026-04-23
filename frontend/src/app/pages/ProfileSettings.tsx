@@ -6,9 +6,9 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
-import { getMe } from '../lib/api';
+import { getMe, isAuthError } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
-import { getCurrentUser, getProfileOverride, setCurrentUser, setProfileOverride } from '../lib/storage';
+import { clearSession, getCurrentUser, getProfileOverride, setCurrentUser, setProfileOverride } from '../lib/storage';
 
 const MAX_BIO_WORDS = 100;
 
@@ -34,6 +34,7 @@ export function ProfileSettings() {
   const [displayName, setDisplayName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
   const [bio, setBio] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -41,6 +42,9 @@ export function ProfileSettings() {
     const loadProfileSettings = async () => {
       const currentUser = getCurrentUser();
       if (!currentUser) {
+        if (isMounted) {
+          setLoading(false);
+        }
         navigate('/');
         return;
       }
@@ -71,8 +75,18 @@ export function ProfileSettings() {
         setDisplayName(latestOverride?.displayName || mergedUser.name);
         setProfilePicture(latestOverride?.avatarUrl || '');
         setBio(latestOverride?.bio || '');
-      } catch {
-        // Keep cached profile values if refresh fails.
+      } catch (error) {
+        if (isAuthError(error)) {
+          clearSession();
+          toast.error(error.message);
+          navigate('/');
+          return;
+        }
+        // Keep cached profile values if non-auth refresh fails.
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -81,6 +95,14 @@ export function ProfileSettings() {
       isMounted = false;
     };
   }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Loading profile settings...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return null;

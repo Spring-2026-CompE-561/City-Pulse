@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { AuthModal } from '../components/AuthModal';
-import { getCurrentUser } from '../lib/storage';
+import { getMe, isAuthError } from '../lib/api';
+import { clearSession, hasValidSession } from '../lib/storage';
 import { MapPin, TrendingUp, Users, Calendar } from 'lucide-react';
 import logoImage from '../../imports/CityPulse_Logo.png';
 
@@ -20,11 +21,26 @@ export function Landing() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If user is already logged in, redirect to feed
-    const user = getCurrentUser();
-    if (user) {
-      navigate('/feed');
-    }
+    let isMounted = true;
+    const bootstrapSession = async () => {
+      if (!hasValidSession()) {
+        return;
+      }
+      try {
+        await getMe();
+        if (isMounted) {
+          navigate('/feed');
+        }
+      } catch (error) {
+        if (isAuthError(error)) {
+          clearSession();
+        }
+      }
+    };
+    bootstrapSession();
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   useEffect(() => {

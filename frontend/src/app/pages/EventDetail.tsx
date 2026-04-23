@@ -11,12 +11,13 @@ import {
   addComment as addCommentRequest,
   deleteEvent,
   getEvent,
+  isAuthError,
   listEventsWithInteractions,
   listTrends,
   removeAttending,
 } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
-import { getCurrentUser, isAttending, rememberAttending } from '../lib/storage';
+import { clearSession, getCurrentUser, isAttending, rememberAttending } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,21 +30,26 @@ export function EventDetail() {
   const [eventData, setEventData] = useState<EventWithInteractionsRead | null>(null);
   const [trending, setTrending] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
-    setUser(currentUser);
     if (!currentUser) {
       navigate('/');
+      return;
     }
+    setUser(currentUser);
   }, [navigate]);
 
   useEffect(() => {
-    if (!id || Number.isNaN(eventId)) {
+    if (!user || !id || Number.isNaN(eventId)) {
       return;
     }
     let isMounted = true;
     const loadEvent = async () => {
+      setLoadError(null);
+      setLoading(true);
       try {
         const [event, interactionRows, trendRows] = await Promise.all([
           getEvent(eventId),
@@ -66,17 +72,46 @@ export function EventDetail() {
         setTrending(trendRows.some((entry) => entry.event_id === eventId));
         setAttending(isAttending(eventId));
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to load event');
-        navigate('/feed');
+        if (isAuthError(error)) {
+          clearSession();
+          toast.error(error.message);
+          navigate('/');
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to load event';
+        setLoadError(message);
+        toast.error(message);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     loadEvent();
     return () => {
       isMounted = false;
     };
-  }, [id, eventId, navigate]);
+  }, [id, eventId, navigate, user]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Loading event details...</p>
+      </div>
+    );
+  }
 
   if (!eventData || !user) {
+    if (loadError) {
+      return (
+        <div className="min-h-screen bg-gray-50 grid place-items-center">
+          <div className="text-center space-y-4">
+            <p className="text-muted-foreground">{loadError}</p>
+            <Button onClick={() => navigate('/feed')}>Back to Feed</Button>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 

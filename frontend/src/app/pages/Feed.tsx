@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { getMe, listCategories, listEventsWithInteractions, listTrends } from '../lib/api';
+import { getMe, isAuthError, listCategories, listEventsWithInteractions, listTrends } from '../lib/api';
 import type { FeedEvent, UserRead } from '../lib/contracts';
 import { clearSession, getCurrentUser, setCurrentUser } from '../lib/storage';
 import { Search, TrendingUp, LogOut, Filter, Plus } from 'lucide-react';
@@ -25,6 +25,7 @@ export function Feed() {
   const [startDate, setStartDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
 
   const neighborhoods = [
@@ -43,10 +44,14 @@ export function Feed() {
     const bootstrap = async () => {
       const sessionUser = getCurrentUser();
       if (!sessionUser) {
+        if (isMounted) {
+          setLoading(false);
+        }
         navigate('/');
         return;
       }
       setUser(sessionUser);
+      setLoadError(null);
       try {
         const [me, eventRows, trendRows, categoryRows] = await Promise.all([
           getMe(),
@@ -73,9 +78,15 @@ export function Feed() {
         );
         setCategories(categoryRows.options);
       } catch (error) {
-        clearSession();
-        toast.error(error instanceof Error ? error.message : 'Session expired');
-        navigate('/');
+        if (isAuthError(error)) {
+          clearSession();
+          toast.error(error.message);
+          navigate('/');
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to load your feed';
+        setLoadError(message);
+        toast.error(message);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -103,7 +114,28 @@ export function Feed() {
 
   const trendingEvents = filteredEvents.filter((event) => event.trending);
 
-  if (!user || loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Loading your feed...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">{loadError}</p>
+          <Button onClick={() => setRefreshToken((value) => value + 1)}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -6,14 +6,16 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { createEvent, listCategories } from '../lib/api';
-import { getCurrentUser } from '../lib/storage';
+import { createEvent, isAuthError, listCategories } from '../lib/api';
+import type { UserRead } from '../lib/contracts';
+import { clearSession, getCurrentUser } from '../lib/storage';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function CreateEvent() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const [user, setUser] = useState<UserRead | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
     'Technology',
     'Arts & Culture',
@@ -36,10 +38,16 @@ export function CreateEvent() {
     eventEndDate: '',
   });
 
-  if (!user) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      setAuthChecked(true);
+      navigate('/');
+      return;
+    }
+    setUser(currentUser);
+    setAuthChecked(true);
+  }, [navigate]);
 
   useEffect(() => {
     listCategories()
@@ -58,6 +66,11 @@ export function CreateEvent() {
       return;
     }
     try {
+      if (!user) {
+        toast.error('Please sign in to create an event');
+        navigate('/');
+        return;
+      }
       await createEvent({
         user_id: user.id,
         title: formData.title,
@@ -77,6 +90,12 @@ export function CreateEvent() {
       toast.success('Event created successfully!');
       navigate('/feed');
     } catch (error) {
+      if (isAuthError(error)) {
+        clearSession();
+        toast.error(error.message);
+        navigate('/');
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to create event');
     }
   };
@@ -84,6 +103,18 @@ export function CreateEvent() {
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <p className="text-muted-foreground">Checking your session...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
