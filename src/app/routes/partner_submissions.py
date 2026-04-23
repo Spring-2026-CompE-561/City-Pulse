@@ -8,8 +8,8 @@ from app.database import get_db
 from app.event_categories import validate_event_category
 from app.models import PartnerSubmission, User
 from app.region_map import REGION_SAN_DIEGO_ID
-from app.repositories.event_repository import create_event
-from app.repositories.partner_submission_repository import (
+from app.repository.event import create_event
+from app.repository.partner_submission import (
     create_submission,
     get_submission_by_id,
     list_submissions,

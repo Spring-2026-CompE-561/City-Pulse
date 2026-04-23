@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import require_ingest_api_key
 from app.database import get_db
 from app.region_map import parse_region_param
-from app.repositories.event_repository import get_event_by_id
-from app.repositories.trend_repository import (
+from app.repository.event import get_event_by_id
+from app.repository.trend import (
     clear_region_trends,
     create_trend_row,
     get_event_interaction_counts_by_region,
@@ -18,7 +18,7 @@ from app.repositories.trend_repository import (
     list_trends_for_region,
     list_trends_with_event_titles,
 )
-from app.repositories.trend_repository import (
+from app.repository.trend import (
     flush as flush_repo,
 )
 from app.schemas import SuccessResponse, TrendEntryRead, TrendRebuildBody, TrendUpdateBody

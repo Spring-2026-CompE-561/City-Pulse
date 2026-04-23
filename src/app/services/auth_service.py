@@ -8,8 +8,8 @@ from app.auth import (
     verify_password,
 )
 from app.models import User
-from app.repositories.region_repository import resolve_region_id_for_city_location
-from app.repositories.user_repository import (
+from app.repository.region import resolve_region_id_for_city_location
+from app.repository.user import (
     create_user,
     get_next_user_id,
     get_user_by_email,

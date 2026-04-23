@@ -12,9 +12,9 @@ from app.database import get_db
 from app.exceptions import bad_request, conflict, not_found, unauthorized
 from app.models import User
 from app.region_map import region_id_to_city_location
-from app.repositories.region_repository import resolve_region_id_for_city_location
-from app.repositories.user_repository import get_user_by_id
-from app.repositories.user_repository import (
+from app.repository.region import resolve_region_id_for_city_location
+from app.repository.user import get_user_by_id
+from app.repository.user import (
     list_users as list_user_rows,
 )
 from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate

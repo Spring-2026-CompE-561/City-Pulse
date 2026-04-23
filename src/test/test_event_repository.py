@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.models import Event
-from app.repositories.event_repository import create_event, update_event_fields
+from app.repository.event import create_event, update_event_fields
 
 
 @pytest.mark.asyncio

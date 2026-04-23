@@ -8,7 +8,7 @@ from sqlmodel import col
 from app.ingestion.dedupe import build_fingerprint, normalize_url
 from app.ingestion.types import NormalizedEvent
 from app.models import Event
-from app.repositories.event_repository import create_event, update_event_fields
+from app.repository.event import create_event, update_event_fields
 
 
 async def _find_existing_event(db: AsyncSession, event: NormalizedEvent) -> Event | None:

@@ -16,13 +16,13 @@ from app.event_categories import (
 from app.exceptions import bad_request, forbidden, not_found
 from app.models import User
 from app.region_map import REGION_SAN_DIEGO_ID, parse_region_param
-from app.repositories.event_repository import (
+from app.repository.event import (
     create_event as create_event_row,
 )
-from app.repositories.event_repository import (
+from app.repository.event import (
     delete_event as delete_event_row,
 )
-from app.repositories.event_repository import (
+from app.repository.event import (
     get_event_by_id,
     list_events_by_region,
     update_event_fields,

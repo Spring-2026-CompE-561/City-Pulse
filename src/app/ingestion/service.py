@@ -6,9 +6,9 @@ from app.ingestion.adapters import fetch_source_events
 from app.ingestion.upsert_service import upsert_normalized_event
 from app.models import Source
 from app.region_map import REGION_SAN_DIEGO_ID
-from app.repositories.ingest_repository import complete_ingest_run, create_ingest_run
-from app.repositories.source_repository import get_source_by_id, list_active_sources
-from app.repositories.trend_repository import (
+from app.repository.ingest import complete_ingest_run, create_ingest_run
+from app.repository.source import get_source_by_id, list_active_sources
+from app.repository.trend import (
     clear_region_trends,
     create_trend_row,
     flush as flush_trends,

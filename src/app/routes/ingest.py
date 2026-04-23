@@ -7,7 +7,7 @@ from app.auth import require_ingest_api_key
 from app.database import get_db
 from app.ingestion.service import run_ingestion
 from app.region_map import REGION_SAN_DIEGO_ID
-from app.repositories.ingest_repository import list_ingest_runs
+from app.repository.ingest import list_ingest_runs
 from app.schemas import IngestRunRead, IngestRunRequest
 
 router = APIRouter(prefix="/api/ingest", tags=["Ingestion"])

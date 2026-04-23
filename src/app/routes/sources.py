@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import require_ingest_api_key
 from app.database import get_db
 from app.region_map import REGION_SAN_DIEGO_ID
-from app.repositories.source_repository import get_source_by_id, list_active_sources
+from app.repository.source import get_source_by_id, list_active_sources
 from app.schemas import SourceRead
 
 router = APIRouter(prefix="/api/sources", tags=["Sources"])

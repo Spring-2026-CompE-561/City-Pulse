@@ -10,33 +10,33 @@ from app.database import get_db
 from app.exceptions import forbidden
 from app.models import User
 from app.region_map import parse_region_param
-from app.repositories.event_repository import get_event_by_id, list_events_by_region
-from app.repositories.interaction_repository import (
+from app.repository.event import get_event_by_id, list_events_by_region
+from app.repository.interaction import (
     add_attending as add_attending_row,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     add_comment as add_comment_row,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     add_like as add_like_row,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     get_attending,
     get_comment_by_id,
     get_event_interaction_counts,
     get_like,
     list_comments_for_event,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     remove_attending as remove_attending_row,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     remove_comment as remove_comment_row,
 )
-from app.repositories.interaction_repository import (
+from app.repository.interaction import (
     remove_like as remove_like_row,
 )
-from app.repositories.source_repository import get_source_by_id
+from app.repository.source import get_source_by_id
 from app.schemas import (
     CommentRead,
     EventWithInteractionsRead,
