@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Send } from 'lucide-react';
 
 import { Button } from '../components/ui/button';
@@ -14,7 +14,7 @@ import { clearSession, getCurrentUser } from '../lib/storage';
 import { toast } from 'sonner';
 
 export function PartnerSubmission() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,12 +38,12 @@ export function PartnerSubmission() {
     const sessionUser = getCurrentUser();
     if (!sessionUser) {
       setAuthChecked(true);
-      navigate('/');
+      router.push('/');
       return;
     }
     setCurrentUser(sessionUser);
     setAuthChecked(true);
-  }, [navigate]);
+  }, [router]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -59,7 +59,7 @@ export function PartnerSubmission() {
     try {
       if (!currentUser) {
         toast.error('Please sign in to submit an event');
-        navigate('/');
+        router.push('/');
         return;
       }
       await submitPartnerEvent({
@@ -80,12 +80,12 @@ export function PartnerSubmission() {
           : undefined,
       });
       toast.success('Submission received and queued for moderation.');
-      navigate('/feed');
+      router.push('/feed');
     } catch (error) {
       if (isAuthError(error)) {
         clearSession();
         toast.error(error.message);
-        navigate('/');
+        router.push('/');
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to submit event');
@@ -110,7 +110,7 @@ export function PartnerSubmission() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/feed')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Feed
           </Button>

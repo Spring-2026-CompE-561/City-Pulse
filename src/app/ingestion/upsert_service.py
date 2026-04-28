@@ -1,14 +1,59 @@
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
+from app.event_categories import ALLOWED_EVENT_CATEGORIES
 from app.ingestion.dedupe import build_fingerprint, normalize_url
 from app.ingestion.types import NormalizedEvent
 from app.models import Event
 from app.repository.event import create_event, update_event_fields
+
+
+def _coerce_ingestion_category(category: str | None, fallback: str) -> str:
+    for raw in (category, fallback):
+        if raw and raw.strip() in ALLOWED_EVENT_CATEGORIES:
+            return raw.strip()
+    return "Community"
+
+
+# Older MySQL schemas may use a short VARCHAR for `events.content` (e.g. 500); stay under that.
+_MAX_CONTENT_LEN = 500
+_MAX_TITLE_LEN = 512
+_MAX_PROMO_LEN = 1024
+_MAX_PRICE_INFO_LEN = 255
+_REJECT_TITLE_TOKENS = ("calendar", "upcoming events", "all events")
+
+
+def _clamp_str(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 3].rstrip() + "..."
+
+
+def _normalized_clamped_for_db(normalized: NormalizedEvent) -> NormalizedEvent:
+    return replace(
+        normalized,
+        title=_clamp_str(normalized.title, _MAX_TITLE_LEN) or "",
+        content=_clamp_str(normalized.content, _MAX_CONTENT_LEN),
+        promo_summary=_clamp_str(normalized.promo_summary, _MAX_PROMO_LEN),
+        price_info=_clamp_str(normalized.price_info, _MAX_PRICE_INFO_LEN),
+    )
+
+
+def _ensure_discrete_event_shape(normalized: NormalizedEvent) -> None:
+    title = (normalized.title or "").strip().lower()
+    if not title:
+        raise ValueError("ingestion rejected: missing title")
+    if any(token in title for token in _REJECT_TITLE_TOKENS):
+        raise ValueError("ingestion rejected: calendar/listing page")
+    if not (normalized.venue_name and normalized.venue_name.strip()):
+        raise ValueError("ingestion rejected: missing venue")
 
 
 async def _find_existing_event(db: AsyncSession, event: NormalizedEvent) -> Event | None:
@@ -49,6 +94,9 @@ async def upsert_normalized_event(
     normalized: NormalizedEvent,
 ) -> str:
     now = datetime.now(UTC)
+    normalized = _normalized_clamped_for_db(normalized)
+    _ensure_discrete_event_shape(normalized)
+    safe_category = _coerce_ingestion_category(normalized.category, "Nightlife")
     fingerprint = build_fingerprint(
         title=normalized.title,
         venue_name=normalized.venue_name,
@@ -65,7 +113,7 @@ async def upsert_normalized_event(
             db,
             event=existing,
             title=normalized.title,
-            category=normalized.category,
+            category=safe_category,
             content=normalized.content,
             event_start_at=normalized.event_start_at,
             event_end_at=normalized.event_end_at,
@@ -92,7 +140,7 @@ async def upsert_normalized_event(
         region_id=region_id,
         user_id=None,
         title=normalized.title,
-        category=normalized.category,
+        category=safe_category,
         content=normalized.content,
         source_id=normalized.source_id,
         origin_type=normalized.origin_type,

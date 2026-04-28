@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { Home, Search } from 'lucide-react';
 
 export function NotFound() {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -17,11 +17,11 @@ export function NotFound() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button onClick={() => navigate('/feed')} size="lg">
+          <Button onClick={() => router.push('/feed')} size="lg">
             <Home className="w-4 h-4 mr-2" />
             Go to Home
           </Button>
-          <Button onClick={() => navigate(-1)} variant="outline" size="lg">
+          <Button onClick={() => router.back()} variant="outline" size="lg">
             Go Back
           </Button>
         </div>

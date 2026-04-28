@@ -1,5 +1,6 @@
 """Interactions API: list events with interactions; add/remove likes, comments, attending."""
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
@@ -45,6 +46,7 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api/interactions", tags=["Interactions"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=list[EventWithInteractionsRead])
@@ -94,41 +96,54 @@ async def list_events_with_interactions(
             db, event_id=event_id
         )
         comments = await list_comments_for_event(db, event_id=event_id)
+        safe_comments: list[CommentRead] = []
+        for c in comments:
+            try:
+                safe_comments.append(CommentRead.model_validate(c))
+            except Exception:
+                logger.warning(
+                    "Skipping malformed comment id=%s for event_id=%s",
+                    getattr(c, "id", None),
+                    event_id,
+                )
         source_name = None
         if ev.source_id is not None:
             source = await get_source_by_id(db, ev.source_id)
             source_name = source.name if source is not None else None
-        out.append(
-            EventWithInteractionsRead(
-                id=event_id,
-                region_id=ev.region_id,
-                user_id=ev.user_id,
-                title=ev.title,
-                category=ev.category,
-                content=ev.content,
-                source_id=ev.source_id,
-                source_name=source_name,
-                origin_type=ev.origin_type,
-                external_url=ev.external_url,
-                canonical_url=ev.canonical_url,
-                event_start_at=ev.event_start_at,
-                event_end_at=ev.event_end_at,
-                timezone=ev.timezone,
-                venue_name=ev.venue_name,
-                venue_address=ev.venue_address,
-                neighborhood=ev.neighborhood,
-                city=ev.city,
-                price_info=ev.price_info,
-                promo_summary=ev.promo_summary,
-                source_confidence=ev.source_confidence,
-                last_seen_at=ev.last_seen_at,
-                created_at=ev.created_at,
-                likes_count=likes_value,
-                comments_count=comments_value,
-                attendance_count=attendance_value,
-                comments=[CommentRead.model_validate(c) for c in comments],
+        try:
+            out.append(
+                EventWithInteractionsRead(
+                    id=event_id,
+                    region_id=ev.region_id,
+                    user_id=ev.user_id,
+                    title=ev.title or "Untitled event",
+                    category=ev.category or "Community",
+                    content=ev.content,
+                    source_id=ev.source_id,
+                    source_name=source_name,
+                    origin_type=ev.origin_type or "user",
+                    external_url=ev.external_url,
+                    canonical_url=ev.canonical_url,
+                    event_start_at=ev.event_start_at,
+                    event_end_at=ev.event_end_at,
+                    timezone=ev.timezone or "America/Los_Angeles",
+                    venue_name=ev.venue_name,
+                    venue_address=ev.venue_address,
+                    neighborhood=ev.neighborhood,
+                    city=ev.city or "San Diego",
+                    price_info=ev.price_info,
+                    promo_summary=ev.promo_summary,
+                    source_confidence=ev.source_confidence,
+                    last_seen_at=ev.last_seen_at,
+                    created_at=ev.created_at,
+                    likes_count=likes_value,
+                    comments_count=comments_value,
+                    attendance_count=attendance_value,
+                    comments=safe_comments,
+                )
             )
-        )
+        except Exception:
+            logger.exception("Skipping event_id=%s for feed response (schema mismatch)", event_id)
     return out
 
 

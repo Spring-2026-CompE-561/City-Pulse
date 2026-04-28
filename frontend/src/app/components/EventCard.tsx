@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
@@ -17,7 +17,7 @@ export function EventCard({ event }: EventCardProps) {
       : 'Imported listing';
 
   return (
-    <Link to={`/event/${event.id}`}>
+    <Link href={`/event/${event.id}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
         <div className="relative h-12 bg-gradient-to-r from-blue-50 to-orange-50">
           {event.trending && (

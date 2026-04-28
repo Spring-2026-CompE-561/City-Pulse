@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -29,7 +29,7 @@ function trim_to_max_words(value: string, maxWords: number): string {
 }
 
 export function ProfileSettings() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
@@ -45,7 +45,7 @@ export function ProfileSettings() {
         if (isMounted) {
           setLoading(false);
         }
-        navigate('/');
+        router.push('/');
         return;
       }
 
@@ -79,7 +79,7 @@ export function ProfileSettings() {
         if (isAuthError(error)) {
           clearSession();
           toast.error(error.message);
-          navigate('/');
+          router.push('/');
           return;
         }
         // Keep cached profile values if non-auth refresh fails.
@@ -94,7 +94,7 @@ export function ProfileSettings() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [router]);
 
   if (loading) {
     return (
@@ -135,7 +135,7 @@ export function ProfileSettings() {
     setCurrentUser(updatedUser);
     setUser(updatedUser);
     toast.success('Profile updated successfully!');
-    navigate('/profile');
+    router.push('/profile');
   };
 
   const handle_profile_picture_upload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,7 +161,7 @@ export function ProfileSettings() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/profile')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Profile
           </Button>
@@ -217,7 +217,7 @@ export function ProfileSettings() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => navigate('/profile')}>
+              <Button variant="outline" onClick={() => router.push('/profile')}>
                 Cancel
               </Button>
               <Button onClick={handle_save_profile}>Save Profile</Button>

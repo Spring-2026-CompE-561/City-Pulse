@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -11,7 +12,7 @@ import { ArrowLeft, Calendar, MapPin, TrendingUp, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Profile() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
   const [events, setEvents] = useState<EventWithInteractionsRead[]>([]);
   const [attendingEventIds, setAttendingEventIds] = useState<number[]>([]);
@@ -28,7 +29,7 @@ export function Profile() {
         if (isMounted) {
           setLoading(false);
         }
-        navigate('/');
+        router.push('/');
         return;
       }
       const cachedOverride = getProfileOverride(currentUser.id);
@@ -62,7 +63,7 @@ export function Profile() {
         if (isAuthError(error)) {
           clearSession();
           toast.error(error.message);
-          navigate('/');
+          router.push('/');
           return;
         }
         // Keep locally cached user/session values if non-auth refresh fails.
@@ -76,7 +77,7 @@ export function Profile() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [router]);
 
   if (loading) {
     return (
@@ -98,7 +99,7 @@ export function Profile() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/feed')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Feed
           </Button>
@@ -123,7 +124,7 @@ export function Profile() {
                   <p className="text-muted-foreground mt-4 max-w-2xl">{bio}</p>
                 )}
               </div>
-              <Button variant="outline" onClick={() => navigate('/profile/settings')}>
+              <Button variant="outline" onClick={() => router.push('/profile/settings')}>
                 Profile Settings
               </Button>
             </div>
@@ -158,13 +159,13 @@ export function Profile() {
                 <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No events yet</h3>
                 <p className="text-muted-foreground mb-4">Start exploring and attend events in your area</p>
-                <Button onClick={() => navigate('/feed')}>Discover Events</Button>
+                <Button onClick={() => router.push('/feed')}>Discover Events</Button>
               </CardContent>
             </Card>
           ) : (
             <div className="grid sm:grid-cols-2 gap-4">
               {attendingEvents.map((event) => (
-                <Link key={event.id} to={`/event/${event.id}`}>
+                <Link key={event.id} href={`/event/${event.id}`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="relative h-32 overflow-hidden">
                       <img
@@ -202,7 +203,7 @@ export function Profile() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               {organizedEvents.map((event) => (
-                <Link key={event.id} to={`/event/${event.id}`}>
+                <Link key={event.id} href={`/event/${event.id}`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="relative h-32 overflow-hidden">
                       <img

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
@@ -22,8 +22,8 @@ import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, S
 import { toast } from 'sonner';
 
 export function EventDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const id = typeof router.query.id === 'string' ? router.query.id : undefined;
   const eventId = Number(id);
   const [user, setUser] = useState<UserRead | null>(null);
   const [attending, setAttending] = useState(false);
@@ -36,11 +36,11 @@ export function EventDetail() {
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
-      navigate('/');
+      router.push('/');
       return;
     }
     setUser(currentUser);
-  }, [navigate]);
+  }, [router]);
 
   useEffect(() => {
     if (!user || !id || Number.isNaN(eventId)) {
@@ -75,7 +75,7 @@ export function EventDetail() {
         if (isAuthError(error)) {
           clearSession();
           toast.error(error.message);
-          navigate('/');
+          router.push('/');
           return;
         }
         const message = error instanceof Error ? error.message : 'Failed to load event';
@@ -91,7 +91,7 @@ export function EventDetail() {
     return () => {
       isMounted = false;
     };
-  }, [id, eventId, navigate, user]);
+  }, [id, eventId, router, user]);
 
   if (loading) {
     return (
@@ -107,7 +107,7 @@ export function EventDetail() {
         <div className="min-h-screen bg-gray-50 grid place-items-center">
           <div className="text-center space-y-4">
             <p className="text-muted-foreground">{loadError}</p>
-            <Button onClick={() => navigate('/feed')}>Back to Feed</Button>
+            <Button onClick={() => router.push('/feed')}>Back to Feed</Button>
           </div>
         </div>
       );
@@ -166,7 +166,7 @@ export function EventDetail() {
     try {
       await deleteEvent(eventId);
       toast.success('Event deleted!');
-      navigate('/feed');
+      router.push('/feed');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete event');
     }
@@ -180,7 +180,7 @@ export function EventDetail() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/feed')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Events
           </Button>

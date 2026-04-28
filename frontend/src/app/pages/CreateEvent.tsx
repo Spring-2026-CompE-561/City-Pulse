@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,7 +13,7 @@ import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function CreateEvent() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
@@ -42,12 +42,12 @@ export function CreateEvent() {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       setAuthChecked(true);
-      navigate('/');
+      router.push('/');
       return;
     }
     setUser(currentUser);
     setAuthChecked(true);
-  }, [navigate]);
+  }, [router]);
 
   useEffect(() => {
     listCategories()
@@ -68,7 +68,7 @@ export function CreateEvent() {
     try {
       if (!user) {
         toast.error('Please sign in to create an event');
-        navigate('/');
+        router.push('/');
         return;
       }
       await createEvent({
@@ -88,12 +88,12 @@ export function CreateEvent() {
           : undefined,
       });
       toast.success('Event created successfully!');
-      navigate('/feed');
+      router.push('/feed');
     } catch (error) {
       if (isAuthError(error)) {
         clearSession();
         toast.error(error.message);
-        navigate('/');
+        router.push('/');
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to create event');
@@ -122,7 +122,7 @@ export function CreateEvent() {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/feed')}>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Feed
             </Button>
@@ -265,7 +265,7 @@ export function CreateEvent() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => navigate('/feed')}
+                  onClick={() => router.push('/feed')}
                 >
                   Cancel
                 </Button>

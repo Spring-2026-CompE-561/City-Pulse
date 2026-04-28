@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { EventCard } from '../components/EventCard';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,7 +15,7 @@ import { toast } from 'sonner';
 import logoImage from '../../imports/CityPulse_Logo.png';
 
 export function Feed() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [categories, setCategories] = useState<string[]>(['All Categories']);
@@ -27,6 +28,17 @@ export function Feed() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+
+  function startsAfterIsoFromDateInput(value: string): string | undefined {
+    if (!value.trim()) {
+      return undefined;
+    }
+    const parsed = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+    return parsed.toISOString();
+  }
 
   const neighborhoods = [
     'All Neighborhoods',
@@ -47,7 +59,7 @@ export function Feed() {
         if (isMounted) {
           setLoading(false);
         }
-        navigate('/');
+        router.push('/');
         return;
       }
       setUser(sessionUser);
@@ -59,7 +71,7 @@ export function Feed() {
             category: selectedCategory,
             neighborhood:
               selectedNeighborhood === 'All Neighborhoods' ? undefined : selectedNeighborhood,
-            starts_after: startDate ? new Date(startDate).toISOString() : undefined,
+            starts_after: startsAfterIsoFromDateInput(startDate),
           }),
           listTrends(),
           listCategories(),
@@ -81,7 +93,7 @@ export function Feed() {
         if (isAuthError(error)) {
           clearSession();
           toast.error(error.message);
-          navigate('/');
+          router.push('/');
           return;
         }
         const message = error instanceof Error ? error.message : 'Failed to load your feed';
@@ -97,12 +109,12 @@ export function Feed() {
     return () => {
       isMounted = false;
     };
-  }, [navigate, refreshToken, selectedCategory, selectedNeighborhood, startDate]);
+  }, [router, refreshToken, selectedCategory, selectedNeighborhood, startDate]);
 
   const handleLogout = () => {
     clearSession();
     toast.success('Logged out successfully');
-    navigate('/');
+    router.push('/');
   };
 
   const filteredEvents = events.filter((event) => {
@@ -143,8 +155,8 @@ export function Feed() {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/feed" className="flex items-center gap-3">
-              <img src={logoImage} alt="CityPulse Logo" className="w-8 h-8" />
+            <Link href="/feed" className="flex items-center gap-3">
+              <img src={logoImage.src} alt="CityPulse Logo" className="w-8 h-8" />
               <span className="text-2xl font-bold" style={{ 
                 background: 'linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)',
                 WebkitBackgroundClip: 'text',
@@ -156,7 +168,7 @@ export function Feed() {
             </Link>
 
             <div className="flex items-center gap-4">
-              <Link to="/profile">
+              <Link href="/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <Avatar className="w-8 h-8">
                     <AvatarImage src="" alt={user.name} />
@@ -184,11 +196,11 @@ export function Feed() {
               Discover events happening in {user.city_location ?? 'san diego'}
             </p>
           </div>
-          <Button onClick={() => navigate('/create')} className="gap-2">
+          <Button onClick={() => router.push('/create')} className="gap-2">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Create Event</span>
           </Button>
-          <Button variant="outline" onClick={() => navigate('/submit-partner-event')}>
+          <Button variant="outline" onClick={() => router.push('/submit-partner-event')}>
             Submit Public Event
           </Button>
         </div>

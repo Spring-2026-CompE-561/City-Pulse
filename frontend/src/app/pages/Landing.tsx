@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { AuthModal } from '../components/AuthModal';
 import { getMe, isAuthError } from '../lib/api';
@@ -18,7 +18,7 @@ const heroImages = [
 export function Landing() {
   const [showAuth, setShowAuth] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
@@ -29,7 +29,7 @@ export function Landing() {
       try {
         await getMe();
         if (isMounted) {
-          navigate('/feed');
+          router.push('/feed');
         }
       } catch (error) {
         if (isAuthError(error)) {
@@ -41,7 +41,7 @@ export function Landing() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [router]);
 
   useEffect(() => {
     // Slideshow interval
@@ -53,7 +53,7 @@ export function Landing() {
   }, []);
 
   const handleAuthSuccess = () => {
-    navigate('/feed');
+    router.push('/feed');
   };
 
   return (
@@ -63,7 +63,7 @@ export function Landing() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src={logoImage} alt="CityPulse Logo" className="w-10 h-10" />
+              <img src={logoImage.src} alt="CityPulse Logo" className="w-10 h-10" />
               <span className="text-2xl font-bold" style={{ 
                 background: 'linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)',
                 WebkitBackgroundClip: 'text',

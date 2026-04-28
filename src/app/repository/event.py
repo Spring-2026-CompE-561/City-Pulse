@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
-from app.models import Event
+from app.models import Event, Trend
 
 
 async def list_events_by_region(
@@ -152,4 +152,26 @@ async def delete_event(db: AsyncSession, *, event: Event) -> None:
 async def delete_events_by_user_id(db: AsyncSession, *, user_id: int) -> None:
     await db.execute(delete(Event).where(col(Event.user_id) == user_id))
     await db.flush()
+
+
+async def delete_bad_calendar_events(db: AsyncSession, *, region_id: int) -> int:
+    """Delete known bad calendar/listing ingest rows that should never render as events."""
+    matching_ids_result = await db.execute(
+        select(col(Event.id)).where(
+            col(Event.region_id) == region_id,
+            col(Event.origin_type) == "source",
+            (
+                func.lower(col(Event.title)).like("%north park observatory calendar%")
+                | func.lower(col(Event.title)).like("%upcoming events%")
+                | func.lower(col(Event.title)).like("%all events%")
+            ),
+        )
+    )
+    matching_ids = [event_id for event_id in matching_ids_result.scalars().all() if event_id is not None]
+    if not matching_ids:
+        return 0
+    await db.execute(delete(Trend).where(col(Trend.event_id).in_(matching_ids)))
+    result = await db.execute(delete(Event).where(col(Event.id).in_(matching_ids)))
+    await db.flush()
+    return int(result.rowcount or 0)
 

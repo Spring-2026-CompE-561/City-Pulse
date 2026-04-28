@@ -1,0 +1,13 @@
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/404": "pages/404.js",
+  "/create": "pages/create.js",
+  "/event/[id]": "pages/event/[id].js",
+  "/feed": "pages/feed.js",
+  "/": "pages/index.js",
+  "/profile": "pages/profile.js",
+  "/profile/settings": "pages/profile/settings.js",
+  "/submit-partner-event": "pages/submit-partner-event.js",
+  "/_document": "pages/_document.js"
+}

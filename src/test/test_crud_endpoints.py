@@ -60,7 +60,7 @@ def test_list_users_endpoint(monkeypatch):
 
 
 def test_list_events_endpoint(monkeypatch):
-    async def _fake_list_events(_db, region_id, skip, limit, category=None):
+    async def _fake_list_events(_db, region_id, skip, limit, category=None, **kwargs):
         return [
             Event(
                 id=10,

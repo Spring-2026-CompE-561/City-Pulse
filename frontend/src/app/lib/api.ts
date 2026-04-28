@@ -20,7 +20,22 @@ import {
   setRefreshToken,
 } from './storage';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL
+  ?? process.env.VITE_API_BASE_URL
+  ?? '';
+
+function build_api_url(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const base = API_BASE_URL.trim().replace(/\/+$/, '');
+  if (!base) {
+    return normalizedPath;
+  }
+  if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+    return `${base}${normalizedPath.slice(4)}`;
+  }
+  return `${base}${normalizedPath}`;
+}
 
 interface RequestOptions extends RequestInit {
   auth?: boolean;
@@ -73,10 +88,18 @@ function parse_refresh_fallback_token(payload: unknown): string | null {
 }
 
 async function try_refresh_with_options(path: string, init: RequestInit): Promise<string | null> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(build_api_url(path), {
+      ...init,
+      credentials: 'same-origin',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.');
+    }
+    throw error;
+  }
   if (!response.ok) {
     return null;
   }
@@ -138,11 +161,19 @@ async function request<T>(path: string, options: RequestOptions = {}, alreadyRet
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...rest,
-    headers: nextHeaders,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(build_api_url(path), {
+      ...rest,
+      headers: nextHeaders,
+      credentials: 'same-origin',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.');
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     if (auth && response.status === 401 && !alreadyRetried) {
@@ -212,11 +243,13 @@ export function listEventsWithInteractions(
   if (filters.starts_before) {
     query.set('starts_before', filters.starts_before);
   }
-  return request<EventWithInteractionsRead[]>(`/api/interactions?${query.toString()}`);
+  // Trailing slash avoids FastAPI 307 redirects; redirect follow + credentialed fetch
+  // often surfaces in the UI as a generic "Failed to fetch".
+  return request<EventWithInteractionsRead[]>(`/api/interactions/?${query.toString()}`);
 }
 
 export function listTrends(): Promise<TrendEntryRead[]> {
-  return request<TrendEntryRead[]>('/api/trends?region=san%20diego');
+  return request<TrendEntryRead[]>('/api/trends/?region=san%20diego');
 }
 
 export function listCategories(): Promise<EventCategoryOptionsResponse> {
