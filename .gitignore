@@ -21,4 +21,9 @@ __pycache__/
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
 mySQL-authentication.txt
-frontend/node_modules/
+node_modules/
+.next/
+dist/
+.vercel/
+nohup.out
+uvicorn.log
