@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
+import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
 import { Calendar, ExternalLink, MapPin, TrendingUp, Users } from 'lucide-react';
@@ -10,21 +11,7 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const eventDate = new Date(event.event_start_at ?? event.created_at);
-  const categoryImages: Record<string, string> = {
-    'Environment': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop',
-    'Music': 'https://images.unsplash.com/photo-1514525253344-9914f2777e8d?w=400&h=200&fit=crop',
-    'Food & Drink': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=200&fit=crop',
-    'Arts & Culture': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400&h=200&fit=crop',
-    'Entertainment': 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&h=200&fit=crop',
-    'Business': 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=200&fit=crop',
-    'Health & Wellness': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=200&fit=crop',
-    'Nightlife': 'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=400&h=200&fit=crop',
-    'Charity & Causes': 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop',
-    'Community': 'https://images.unsplash.com/photo-1529156069898-19953cC87?w=400&h=200&fit=crop',
-    'Technology': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=200&fit=crop',
-    'Sports': 'https://images.unsplash.com/photo-1461896836934-ffe607ca82b3?w=400&h=200&fit=crop',
-  };
-  const eventImage = categoryImages[event.category] || 'https://images.unsplash.com/photo-1501281668745-f7f57925c73d?w=400&h=200&fit=crop';
+  const eventImage = CATEGORY_IMAGES[event.category] || DEFAULT_CATEGORY_IMAGE;
 
   const sourceLabel = event.source_name
     ? `Imported from ${event.source_name}`

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { getMe, isAuthError, listEventsWithInteractions } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
+import { CATEGORY_IMAGES } from '../lib/constants';
 import { clearSession, getCurrentUser, getProfileOverride, getStorageData, setCurrentUser } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, TrendingUp, Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -169,7 +170,7 @@ export function Profile() {
                   <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="relative h-32 overflow-hidden">
                       <img
-                        src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&h=600&fit=crop"
+                        src={CATEGORY_IMAGES[event.category] || CATEGORY_IMAGES['Entertainment']}
                         alt={event.title}
                         className="w-full h-full object-cover"
                       />
@@ -205,30 +206,30 @@ export function Profile() {
               {organizedEvents.map((event) => (
                 <Link key={event.id} href={`/event/${event.id}`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                    <div className="relative h-32 overflow-hidden">
-                      <img
-                        src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&h=600&fit=crop"
-                        alt={event.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <CardHeader className="p-4">
-                      <h3 className="font-semibold line-clamp-2">{event.title}</h3>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="w-4 h-4" />
-                          <span>
-                            {new Date(event.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {event.attendance_count} attending
-                        </Badge>
+<div className="relative h-32 overflow-hidden">
+                        <img
+                          src={CATEGORY_IMAGES[event.category] || CATEGORY_IMAGES['Entertainment']}
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                    </CardHeader>
+                      <CardHeader className="p-4">
+                        <h3 className="font-semibold line-clamp-2">{event.title}</h3>
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            <span>
+                              {new Date(event.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {event.attendance_count} attending
+                          </Badge>
+                        </div>
+                      </CardHeader>
                   </Card>
                 </Link>
               ))}
