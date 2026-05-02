@@ -16,6 +16,7 @@ export interface EventRead {
   id: number;
   region_id: number;
   user_id: number | null;
+  user_name?: string;
   title: string;
   category: string;
   content: string | null;
@@ -44,6 +45,7 @@ export interface CommentRead {
   id: number;
   user_id: number;
   event_id: number;
+  user_name?: string;
   text: string;
   created_at: string;
 }

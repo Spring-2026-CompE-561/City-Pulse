@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from sqlmodel import col
 
 from app.models import Event, Trend
@@ -18,7 +19,7 @@ async def list_events_by_region(
     starts_after: datetime | None = None,
     starts_before: datetime | None = None,
 ) -> list[Event]:
-    query = select(Event).where(col(Event.region_id) == region_id)
+    query = select(Event).where(col(Event.region_id) == region_id).options(joinedload(Event.user))
     if category is not None:
         query = query.where(col(Event.category) == category)
     if neighborhood is not None:
@@ -37,7 +38,10 @@ async def list_events_by_region(
 
 
 async def get_event_by_id(db: AsyncSession, event_id: int) -> Event | None:
-    return await db.get(Event, event_id)
+    result = await db.execute(
+        select(Event).where(col(Event.id) == event_id).options(joinedload(Event.user))
+    )
+    return result.scalar_one_or_none()
 
 
 async def create_event(

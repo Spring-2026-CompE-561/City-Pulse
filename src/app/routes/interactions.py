@@ -99,7 +99,14 @@ async def list_events_with_interactions(
         safe_comments: list[CommentRead] = []
         for c in comments:
             try:
-                safe_comments.append(CommentRead.model_validate(c))
+                safe_comments.append(CommentRead(
+                    id=c.id,
+                    user_id=c.user_id,
+                    event_id=c.event_id,
+                    user_name=c.user.name if c.user else None,
+                    text=c.text,
+                    created_at=c.created_at,
+                ))
             except Exception:
                 logger.warning(
                     "Skipping malformed comment id=%s for event_id=%s",
@@ -116,6 +123,7 @@ async def list_events_with_interactions(
                     id=event_id,
                     region_id=ev.region_id,
                     user_id=ev.user_id,
+                    user_name=ev.user.name if ev.user else None,
                     title=ev.title or "Untitled event",
                     category=ev.category or "Community",
                     content=ev.content,

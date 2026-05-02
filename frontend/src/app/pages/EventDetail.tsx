@@ -183,6 +183,22 @@ export function EventDetail() {
   const createdDate = new Date(eventData.created_at);
   const startDate = eventData.event_start_at ? new Date(eventData.event_start_at) : null;
 
+  const categoryImages: Record<string, string> = {
+    'Environment': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=800&fit=crop',
+    'Music': 'https://images.unsplash.com/photo-1514525253344-9914f2777e8d?w=1200&h=800&fit=crop',
+    'Food & Drink': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=800&fit=crop',
+    'Arts & Culture': 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=1200&h=800&fit=crop',
+    'Entertainment': 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&h=800&fit=crop',
+    'Business': 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&h=800&fit=crop',
+    'Health & Wellness': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&h=800&fit=crop',
+    'Nightlife': 'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=1200&h=800&fit=crop',
+    'Charity & Causes': 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&h=800&fit=crop',
+    'Community': 'https://images.unsplash.com/photo-1529156069898-19953cC87?w=1200&h=800&fit=crop',
+    'Technology': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=800&fit=crop',
+    'Sports': 'https://images.unsplash.com/photo-1461896836934-ffe607ca82b3?w=1200&h=800&fit=crop',
+  };
+  const eventImage = categoryImages[eventData.category] || categoryImages['Entertainment'];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
@@ -197,7 +213,7 @@ export function EventDetail() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="relative h-96 rounded-xl overflow-hidden mb-8">
           <img
-            src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&h=800&fit=crop"
+            src={eventImage}
             alt={eventData.title}
             className="w-full h-full object-cover"
           />
@@ -319,7 +335,7 @@ export function EventDetail() {
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">User #{comment.user_id}</span>
+                            <span className="font-semibold">{comment.user_name ?? `User #${comment.user_id}`}</span>
                             <span className="text-sm text-muted-foreground">
                                {new Date(comment.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                             </span>
