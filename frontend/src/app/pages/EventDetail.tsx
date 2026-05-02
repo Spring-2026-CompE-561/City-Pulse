@@ -360,19 +360,10 @@ export function EventDetail() {
             {isUserEvent && (
               <Card>
                 <CardContent className="p-6">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button className="w-full" variant="outline">
-                          Manage Event
-                        </Button>
-                      </DropdownMenuTrigger>
-                       <DropdownMenuContent align="start" className="w-full">
-                         <DropdownMenuItem onClick={handleDeleteEvent} className="text-destructive focus:text-destructive">
-                           <Trash2 className="w-4 h-4 mr-2" />
-                           Delete Event
-                         </DropdownMenuItem>
-                       </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button onClick={handleDeleteEvent} className="w-full" variant="destructive">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Event
+                    </Button>
                 </CardContent>
               </Card>
             )}
