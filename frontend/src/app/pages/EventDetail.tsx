@@ -4,6 +4,13 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+
 import { Textarea } from '../components/ui/textarea';
 import { Separator } from '../components/ui/separator';
 import {
@@ -223,23 +230,41 @@ export function EventDetail() {
                   <div>
                     <div className="text-sm text-muted-foreground">Start time</div>
                     <div className="font-semibold">
-                      {startDate ? startDate.toLocaleString() : createdDate.toLocaleString()}
+                      {startDate ? startDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : createdDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-green-600" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">Location</div>
-                    <div className="font-semibold">
-                      {eventData.venue_name ?? 'San Diego Venue'}
-                      {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+               <Card>
+                 <CardContent className="p-4 flex items-center gap-3">
+                   <MapPin className="w-5 h-5 text-green-600" />
+                   <div>
+                     <div className="text-sm text-muted-foreground">Location</div>
+                     <div className="font-semibold">
+                       {eventData.venue_name ?? 'San Diego Venue'}
+                       {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
+                     </div>
+                   </div>
+                 </CardContent>
+               </Card>
+               <Card>
+                 <CardContent className="p-0 overflow-hidden h-64 bg-gray-200 flex items-center justify-center relative">
+                   <div className="text-center p-4">
+                     <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                     <p className="text-sm text-muted-foreground mb-4">Map view unavailable without API key</p>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                         (eventData.venue_name ?? 'San Diego') + (eventData.neighborhood ? `, ${eventData.neighborhood}` : '')
+                       )}`, '_blank')}
+                     >
+                       View on Google Maps
+                     </Button>
+                   </div>
+                 </CardContent>
+               </Card>
+
             </div>
 
             {eventData.external_url && (
@@ -296,7 +321,7 @@ export function EventDetail() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold">User #{comment.user_id}</span>
                             <span className="text-sm text-muted-foreground">
-                              {new Date(comment.created_at).toLocaleString()}
+                               {new Date(comment.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                             </span>
                           </div>
                           <p className="text-muted-foreground">{comment.text}</p>
@@ -335,10 +360,19 @@ export function EventDetail() {
             {isUserEvent && (
               <Card>
                 <CardContent className="p-6">
-                  <Button onClick={handleDeleteEvent} className="w-full" variant="destructive">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Event
-                  </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="w-full" variant="outline">
+                          Manage Event
+                        </Button>
+                      </DropdownMenuTrigger>
+                       <DropdownMenuContent align="start" className="w-full">
+                         <DropdownMenuItem onClick={handleDeleteEvent} className="text-destructive focus:text-destructive">
+                           <Trash2 className="w-4 h-4 mr-2" />
+                           Delete Event
+                         </DropdownMenuItem>
+                       </DropdownMenuContent>
+                    </DropdownMenu>
                 </CardContent>
               </Card>
             )}
