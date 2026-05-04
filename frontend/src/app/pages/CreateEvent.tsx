@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { createEvent, isAuthError, listCategories } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
-import { clearSession, getCurrentUser } from '../lib/storage';
+import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,7 +40,8 @@ export function CreateEvent() {
 
   useEffect(() => {
     const currentUser = getCurrentUser();
-    if (!currentUser) {
+    const token = getAccessToken();
+    if (!currentUser || !token) {
       setAuthChecked(true);
       router.push('/');
       return;

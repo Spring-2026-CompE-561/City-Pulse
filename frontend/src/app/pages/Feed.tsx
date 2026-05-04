@@ -193,7 +193,7 @@ export function Feed() {
               Welcome back, {user.name}!
             </h1>
             <p className="text-muted-foreground">
-              Discover events happening in {user.city_location ?? 'san diego'}
+              Discover events happening in {(user.city_location ?? 'San Diego').replace(/\b\w/g, l => l.toUpperCase())}
             </p>
           </div>
           <Button onClick={() => router.push('/create')} className="gap-2">

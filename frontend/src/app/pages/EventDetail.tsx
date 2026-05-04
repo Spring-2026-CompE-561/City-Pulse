@@ -4,6 +4,13 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+
 import { Textarea } from '../components/ui/textarea';
 import { Separator } from '../components/ui/separator';
 import {
@@ -17,6 +24,7 @@ import {
   removeAttending,
 } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
+import { CATEGORY_IMAGES } from '../lib/constants';
 import { clearSession, getCurrentUser, isAttending, rememberAttending } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -190,7 +198,7 @@ export function EventDetail() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="relative h-96 rounded-xl overflow-hidden mb-8">
           <img
-            src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&h=800&fit=crop"
+            src={CATEGORY_IMAGES[eventData.category]}
             alt={eventData.title}
             className="w-full h-full object-cover"
           />
@@ -223,23 +231,41 @@ export function EventDetail() {
                   <div>
                     <div className="text-sm text-muted-foreground">Start time</div>
                     <div className="font-semibold">
-                      {startDate ? startDate.toLocaleString() : createdDate.toLocaleString()}
+                      {startDate ? startDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : createdDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-green-600" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">Location</div>
-                    <div className="font-semibold">
-                      {eventData.venue_name ?? 'San Diego Venue'}
-                      {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+               <Card>
+                 <CardContent className="p-4 flex items-center gap-3">
+                   <MapPin className="w-5 h-5 text-green-600" />
+                   <div>
+                     <div className="text-sm text-muted-foreground">Location</div>
+                     <div className="font-semibold">
+                       {eventData.venue_name ?? 'San Diego Venue'}
+                       {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
+                     </div>
+                   </div>
+                 </CardContent>
+               </Card>
+               <Card>
+                 <CardContent className="p-0 overflow-hidden h-64 bg-gray-200 flex items-center justify-center relative">
+                   <div className="text-center p-4">
+                     <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                     <p className="text-sm text-muted-foreground mb-4">Map view unavailable without API key</p>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                         (eventData.venue_name ?? 'San Diego') + (eventData.neighborhood ? `, ${eventData.neighborhood}` : '')
+                       )}`, '_blank')}
+                     >
+                       View on Google Maps
+                     </Button>
+                   </div>
+                 </CardContent>
+               </Card>
+
             </div>
 
             {eventData.external_url && (
@@ -294,9 +320,9 @@ export function EventDetail() {
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">User #{comment.user_id}</span>
+                            <span className="font-semibold">{comment.user_name ?? `User #${comment.user_id}`}</span>
                             <span className="text-sm text-muted-foreground">
-                              {new Date(comment.created_at).toLocaleString()}
+                               {new Date(comment.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                             </span>
                           </div>
                           <p className="text-muted-foreground">{comment.text}</p>
@@ -335,10 +361,10 @@ export function EventDetail() {
             {isUserEvent && (
               <Card>
                 <CardContent className="p-6">
-                  <Button onClick={handleDeleteEvent} className="w-full" variant="destructive">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Event
-                  </Button>
+                    <Button onClick={handleDeleteEvent} className="w-full" variant="destructive">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Event
+                    </Button>
                 </CardContent>
               </Card>
             )}

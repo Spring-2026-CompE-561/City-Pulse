@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
+import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
 import { Calendar, ExternalLink, MapPin, TrendingUp, Users } from 'lucide-react';
@@ -10,23 +11,26 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const eventDate = new Date(event.event_start_at ?? event.created_at);
+  const eventImage = CATEGORY_IMAGES[event.category] || DEFAULT_CATEGORY_IMAGE;
+
   const sourceLabel = event.source_name
     ? `Imported from ${event.source_name}`
     : event.origin_type === 'user'
-      ? `Posted by user #${event.user_id ?? 'unknown'}`
+      ? `Posted by ${event.user_name ?? `user #${event.user_id ?? 'unknown'}`}`
       : 'Imported listing';
 
   return (
     <Link href={`/event/${event.id}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-        <div className="relative h-12 bg-gradient-to-r from-blue-50 to-orange-50">
-          {event.trending && (
-            <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Trending
-            </Badge>
-          )}
-        </div>
+         <div className="relative h-32 overflow-hidden">
+           <img src={eventImage} alt={event.title} className="w-full h-full object-cover" />
+           {event.trending && (
+             <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
+               <TrendingUp className="w-3 h-3 mr-1" />
+               Trending
+             </Badge>
+           )}
+         </div>
         
         <CardHeader>
           <div className="flex items-start justify-between gap-2">

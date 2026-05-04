@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from sqlmodel import col
 
 from app.models import EventAttending, EventComment, EventLike
@@ -54,6 +55,7 @@ async def list_comments_for_event(db: AsyncSession, *, event_id: int) -> list[Ev
         select(EventComment)
         .where(col(EventComment.event_id) == event_id)
         .order_by(col(EventComment.created_at))
+        .options(joinedload(EventComment.user))
     )
     return list(comments_result.scalars().all())
 

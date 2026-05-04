@@ -164,6 +164,7 @@ class EventRead(BaseModel):
     id: int
     region_id: int
     user_id: int | None
+    user_name: str | None = None
     title: str
     category: str
     content: str | None
@@ -245,6 +246,7 @@ class CommentRead(BaseModel):
     id: int
     user_id: int
     event_id: int
+    user_name: str | None = None
     text: str
     created_at: datetime
 
@@ -258,6 +260,7 @@ class EventWithInteractionsRead(BaseModel):
     id: int
     region_id: int
     user_id: int | None
+    user_name: str | None = None
     title: str
     category: str
     content: str | None

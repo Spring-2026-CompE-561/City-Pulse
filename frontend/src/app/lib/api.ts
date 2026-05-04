@@ -118,18 +118,8 @@ async function try_refresh_with_options(path: string, init: RequestInit): Promis
 
 async function refresh_access_token(): Promise<string | null> {
   const refreshPaths = ['/api/auth/refresh', '/api/auth/refresh-token'];
-
-  for (const path of refreshPaths) {
-    const cookieRefreshToken = await try_refresh_with_options(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (cookieRefreshToken) {
-      return cookieRefreshToken;
-    }
-  }
-
   const fallbackRefreshToken = getRefreshToken();
+
   if (!fallbackRefreshToken) {
     return null;
   }

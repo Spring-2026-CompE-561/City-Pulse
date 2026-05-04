@@ -85,7 +85,34 @@ async def get_event(
     event = await get_event_by_id(db, id)
     if not event:
         raise not_found("Event not found")
-    return event
+    return EventRead(
+        id=event.id,
+        region_id=event.region_id,
+        user_id=event.user_id,
+        user_name=event.user.name if event.user else None,
+        title=event.title,
+        category=event.category,
+        content=event.content,
+        source_id=event.source_id,
+        source_name=event.source.name if event.source else None,
+        origin_type=event.origin_type,
+        external_id=event.external_id,
+        external_url=event.external_url,
+        canonical_url=event.canonical_url,
+        event_start_at=event.event_start_at,
+        event_end_at=event.event_end_at,
+        timezone=event.timezone,
+        venue_name=event.venue_name,
+        venue_address=event.venue_address,
+        neighborhood=event.neighborhood,
+        city=event.city,
+        price_info=event.price_info,
+        promo_summary=event.promo_summary,
+        tags_json=event.tags_json,
+        source_confidence=event.source_confidence,
+        last_seen_at=event.last_seen_at,
+        created_at=event.created_at,
+    )
 
 
 @router.post("/", response_model=EventRead, status_code=201)
