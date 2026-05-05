@@ -10,5 +10,6 @@ cryptography
 PyJWT
 pytest
 pytest-asyncio
+pytest-cov
 httpx
 

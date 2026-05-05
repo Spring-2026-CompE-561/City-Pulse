@@ -3,6 +3,7 @@
 from app.routes import (
     auth,
     events,
+    health,
     ingest,
     interactions,
     partner_submissions,
@@ -17,6 +18,7 @@ __all__ = [
     "users",
     "regions",
     "events",
+    "health",
     "trends",
     "interactions",
     "sources",

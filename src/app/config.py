@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     ingest_api_key: str | None = None
     ingest_scheduler_enabled: bool = False
     ingest_scheduler_interval_minutes: int = 60
+    skip_db_init: bool = False
 
     @model_validator(mode="after")
     def set_database_url(self) -> "Settings":

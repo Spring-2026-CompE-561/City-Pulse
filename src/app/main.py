@@ -31,7 +31,8 @@ async def _ingestion_scheduler_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    if not settings.skip_db_init:
+        await init_db()
     scheduler_task: asyncio.Task | None = None
     if settings.ingest_scheduler_enabled:
         scheduler_task = asyncio.create_task(_ingestion_scheduler_loop())
@@ -99,6 +100,7 @@ async def root():
             "/api/users",
             "/api/regions",
             "/api/events",
+            "/api/health",
             "/api/trends",
             "/api/interactions",
             "/api/sources",

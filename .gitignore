@@ -25,5 +25,7 @@ node_modules/
 .next/
 dist/
 .vercel/
+playwright-report/
+test-results/
 nohup.out
 uvicorn.log

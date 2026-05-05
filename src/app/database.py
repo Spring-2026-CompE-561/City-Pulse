@@ -34,22 +34,26 @@ _database_url: str = settings.database_url or ""
 
 # The global async engine shared across the app process.
 # Used by: `async_sessionmaker(...)` to create request sessions.
-engine = create_async_engine(
-    _database_url,
-    echo=settings.debug,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+if settings.skip_db_init:
+    engine = None
+    async_session_maker = None
+else:
+    engine = create_async_engine(
+        _database_url,
+        echo=settings.debug,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
 
-# Session factory used by `get_db()` to create an `AsyncSession` per request.
-async_session_maker = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+    # Session factory used by `get_db()` to create an `AsyncSession` per request.
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -66,6 +70,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Called by
     - Routers and dependencies via `Depends(get_db)`.
     """
+    if async_session_maker is None:
+        raise RuntimeError("Database session factory is unavailable when SKIP_DB_INIT is enabled.")
     async with async_session_maker() as session:
         try:
             # The caller uses this session for all ORM queries/flushes.
@@ -92,6 +98,8 @@ async def init_db() -> None:
     Called by
     - `app.main.lifespan()` during application startup.
     """
+    if engine is None or async_session_maker is None:
+        return
     async with engine.begin() as conn:
         # Create all tables for all SQLModel models (Region, User, Event, etc).
         await conn.run_sync(SQLModel.metadata.create_all)

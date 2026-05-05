@@ -61,20 +61,18 @@ City-Pulse/
 
 ## Run the project
 
-### Local setup (Windows / PowerShell)
+### Local setup (Windows / PowerShell, uv-first)
 
-1. **Create and activate a virtual environment**:
+1. **Install dependencies with uv** (from repo root):
 
    ```bash
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
+   uv sync --extra dev
    ```
 
-2. **Install dependencies** (from repo root):
+2. **Activate environment**:
 
    ```bash
-   pip install -e .
-   pip install -r requirements.txt
+   .\.venv\Scripts\Activate.ps1
    ```
 
 3. **Configure environment** (MySQL):
@@ -95,11 +93,31 @@ City-Pulse/
    - Swagger UI: `http://127.0.0.1:8000/docs`
    - OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
-6. **Run tests**:
+6. **Run backend unit tests with enforced coverage (>=50%)**:
 
    ```bash
    pytest
    ```
+
+7. **Run frontend-backend integration test**:
+
+   ```bash
+   cd frontend
+   npm install
+   npm run test:integration:install
+   npm run test:integration
+   ```
+
+---
+
+## Optional: pip workflow (alternative to uv)
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e .
+pip install -r requirements.txt
+```
 
 ---
 
@@ -135,6 +153,7 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 | `INGEST_API_KEY` | *(required for admin ingestion endpoints)* | Header `X-Ingest-Key` value for source/ingest moderation routes. |
 | `INGEST_SCHEDULER_ENABLED` | `false` | Enables periodic ingestion in app process. |
 | `INGEST_SCHEDULER_INTERVAL_MINUTES` | `60` | Scheduler interval, minimum 5 minutes. |
+| `SKIP_DB_INIT` | `false` | If `true`, skips startup DB initialization (used by integration test harness). |
 
 **Startup behavior**: on app startup it creates tables (if missing) and seeds the default region data.
 
@@ -147,6 +166,7 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 - **`GET /`**: service info + quick list of API prefixes
 - **`GET /docs`**: Swagger UI
 - **`GET /openapi.json`**: OpenAPI schema
+- **`GET /api/health`**: lightweight health endpoint used by integration tests
 
 ### Auth (`/api/auth`)
 

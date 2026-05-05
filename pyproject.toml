@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
     "httpx>=0.27",
     "ruff>=0.8",
     "black>=24.0",
@@ -49,6 +50,7 @@ target-version = ["py311"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["src/test"]
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=50"
 
 [tool.pyright]
 venvPath = "."
