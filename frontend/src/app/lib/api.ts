@@ -3,10 +3,10 @@ import type {
   EventCategoryOptionsResponse,
   EventCreateBody,
   EventFilterParams,
+  EventImageUploadResponse,
   EventRead,
+  EventUpdateBody,
   EventWithInteractionsRead,
-  PartnerSubmissionCreateBody,
-  PartnerSubmissionRead,
   SuccessResponse,
   TokenPair,
   TrendEntryRead,
@@ -33,6 +33,24 @@ function build_api_url(path: string): string {
   }
   if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
     return `${base}${normalizedPath.slice(4)}`;
+  }
+  return `${base}${normalizedPath}`;
+}
+
+export function build_media_url(path: string): string {
+  if (!path) {
+    return path;
+  }
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:')) {
+    return path;
+  }
+  const base = API_BASE_URL.trim().replace(/\/+$/, '');
+  if (!base) {
+    return path;
+  }
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (base.endsWith('/api')) {
+    return `${base.slice(0, -4)}${normalizedPath}`;
   }
   return `${base}${normalizedPath}`;
 }
@@ -141,7 +159,7 @@ async function refresh_access_token(): Promise<string | null> {
 async function request<T>(path: string, options: RequestOptions = {}, alreadyRetried = false): Promise<T> {
   const { auth = false, authToken, headers, ...rest } = options;
   const nextHeaders = new Headers(headers ?? {});
-  if (rest.body && !nextHeaders.has('Content-Type')) {
+  if (rest.body && !(rest.body instanceof FormData) && !nextHeaders.has('Content-Type')) {
     nextHeaders.set('Content-Type', 'application/json');
   }
   if (auth) {
@@ -251,10 +269,21 @@ export function getEvent(id: number): Promise<EventRead> {
 }
 
 export function createEvent(payload: EventCreateBody): Promise<EventRead> {
-  return request<EventRead>('/api/events', {
+  // Use trailing slash to hit FastAPI route directly and avoid redirect auth/header issues.
+  return request<EventRead>('/api/events/', {
     method: 'POST',
     auth: true,
     body: JSON.stringify(payload),
+  });
+}
+
+export function uploadEventImage(file: File): Promise<EventImageUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<EventImageUploadResponse>('/api/events/upload-image', {
+    method: 'POST',
+    auth: true,
+    body: formData,
   });
 }
 
@@ -262,6 +291,14 @@ export function deleteEvent(id: number): Promise<SuccessResponse> {
   return request<SuccessResponse>(`/api/events/${id}`, {
     method: 'DELETE',
     auth: true,
+  });
+}
+
+export function updateEvent(id: number, payload: EventUpdateBody): Promise<SuccessResponse> {
+  return request<SuccessResponse>(`/api/events/${id}`, {
+    method: 'PUT',
+    auth: true,
+    body: JSON.stringify(payload),
   });
 }
 
@@ -287,10 +324,3 @@ export function addComment(eventId: number, text: string): Promise<CommentRead> 
   });
 }
 
-export function submitPartnerEvent(payload: PartnerSubmissionCreateBody): Promise<PartnerSubmissionRead> {
-  return request<PartnerSubmissionRead>('/api/partner-submissions', {
-    method: 'POST',
-    auth: true,
-    body: JSON.stringify(payload),
-  });
-}

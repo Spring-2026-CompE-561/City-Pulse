@@ -200,9 +200,6 @@ export function Feed() {
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Create Event</span>
           </Button>
-          <Button variant="outline" onClick={() => router.push('/submit-partner-event')}>
-            Submit Public Event
-          </Button>
         </div>
 
         {/* Search and Filters */}

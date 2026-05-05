@@ -225,6 +225,15 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 - **`POST /api/ingest/run-all`**: run ingestion for all active sources (requires `X-Ingest-Key`)
 - **`GET /api/ingest/runs`**: recent ingestion runs and parser errors (requires `X-Ingest-Key`)
 
+Backend command alternative:
+
+- `city-pulse-ingest`
+- `city-pulse-ingest --area "North Park"`
+- `city-pulse-ingest --source-id 2 --start-date 2026-05-01T00:00:00Z --end-date 2026-05-31T23:59:59Z`
+- One-time image backfill for existing source events:
+  - `city-pulse-backfill-images`
+  - `city-pulse-backfill-images --limit 500`
+
 ### Partner submissions (`/api/partner-submissions`)
 
 - **`POST /api/partner-submissions`**: authenticated submission path for Instagram/public event links (official-only workflow)

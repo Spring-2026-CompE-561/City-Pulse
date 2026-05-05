@@ -6,11 +6,13 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { createEvent, isAuthError, listCategories } from '../lib/api';
+import { createEvent, isAuthError, listCategories, uploadEventImage } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
 import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+
+const MAX_DESCRIPTION_LENGTH = 10000;
 
 export function CreateEvent() {
   const router = useRouter();
@@ -37,6 +39,8 @@ export function CreateEvent() {
     eventStartDate: '',
     eventEndDate: '',
   });
+  const [eventMediaFile, setEventMediaFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -66,11 +70,21 @@ export function CreateEvent() {
       toast.error('Please fill in all required fields');
       return;
     }
+    if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error('MAX description limit reached');
+      return;
+    }
     try {
+      setIsSubmitting(true);
       if (!user) {
         toast.error('Please sign in to create an event');
         router.push('/');
         return;
+      }
+      let eventImageUrl: string | undefined;
+      if (eventMediaFile) {
+        const uploadResult = await uploadEventImage(eventMediaFile);
+        eventImageUrl = uploadResult.url;
       }
       await createEvent({
         user_id: user.id,
@@ -87,6 +101,7 @@ export function CreateEvent() {
         event_end_at: formData.eventEndDate
           ? new Date(formData.eventEndDate).toISOString()
           : undefined,
+        event_image_url: eventImageUrl,
       });
       toast.success('Event created successfully!');
       router.push('/feed');
@@ -97,12 +112,46 @@ export function CreateEvent() {
         router.push('/');
         return;
       }
+      if (
+        error instanceof Error
+        && /content|description/i.test(error.message)
+        && /max|at most|too long|length/i.test(error.message)
+      ) {
+        toast.error('MAX description limit reached');
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to create event');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (field: string, value: string) => {
+    if (field === 'description' && value.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error('MAX description limit reached');
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEventMediaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setEventMediaFile(null);
+      return;
+    }
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPEG, PNG, and PDF files are allowed');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File too large (max 10 MB)');
+      event.target.value = '';
+      return;
+    }
+    setEventMediaFile(file);
   };
 
   if (!authChecked) {
@@ -171,8 +220,12 @@ export function CreateEvent() {
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   rows={5}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  {formData.description.length}/{MAX_DESCRIPTION_LENGTH}
+                </p>
               </div>
 
               {/* Category */}
@@ -253,19 +306,39 @@ export function CreateEvent() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="eventImage">Event Image/Flyer (JPEG, PNG, PDF)</Label>
+                <Input
+                  id="eventImage"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                  onChange={handleEventMediaChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {eventMediaFile ? `Selected: ${eventMediaFile.name}` : 'Optional. Max size 10 MB.'}
+                </p>
+              </div>
+
               <p className="text-sm text-muted-foreground">
                 Include date, venue, and promo details to improve event discovery quality.
               </p>
 
               {/* Action Buttons */}
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Create Event
+                <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    'Creating...'
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Create Event
+                    </>
+                  )}
                 </Button>
                 <Button 
                   type="button" 
                   variant="outline" 
+                  disabled={isSubmitting}
                   onClick={() => router.push('/feed')}
                 >
                   Cancel

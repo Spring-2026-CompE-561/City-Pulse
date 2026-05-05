@@ -15,6 +15,7 @@ dependencies = [
     "asyncmy>=0.2.9",
     "cryptography>=42.0.0",
     "PyJWT>=2.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,10 @@ dev = [
     "black>=24.0",
     "pre-commit>=3.0",
 ]
+
+[project.scripts]
+city-pulse-ingest = "app.commands.ingest:main"
+city-pulse-backfill-images = "app.commands.backfill_event_images:main"
 
 [build-system]
 requires = ["hatchling"]

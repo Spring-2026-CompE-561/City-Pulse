@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlmodel import col
 
+from app.ingestion.dedupe import build_content_signature
 from app.models import Event, Trend
 
 
@@ -39,7 +40,9 @@ async def list_events_by_region(
 
 async def get_event_by_id(db: AsyncSession, event_id: int) -> Event | None:
     result = await db.execute(
-        select(Event).where(col(Event.id) == event_id).options(joinedload(Event.user))
+        select(Event)
+        .where(col(Event.id) == event_id)
+        .options(joinedload(Event.user), joinedload(Event.source))
     )
     return result.scalar_one_or_none()
 
@@ -57,6 +60,7 @@ async def create_event(
     external_id: str | None = None,
     external_url: str | None = None,
     canonical_url: str | None = None,
+    event_image_url: str | None = None,
     event_start_at: datetime | None = None,
     event_end_at: datetime | None = None,
     timezone: str = "America/Los_Angeles",
@@ -81,6 +85,7 @@ async def create_event(
         external_id=external_id,
         external_url=external_url,
         canonical_url=canonical_url,
+        event_image_url=event_image_url,
         event_start_at=event_start_at,
         event_end_at=event_end_at,
         timezone=timezone,
@@ -108,6 +113,7 @@ async def update_event_fields(
     title: str | None,
     category: str | None,
     content: str | None,
+    event_image_url: str | None = None,
     event_start_at: datetime | None = None,
     event_end_at: datetime | None = None,
     timezone: str | None = None,
@@ -125,6 +131,8 @@ async def update_event_fields(
         event.category = category
     if content is not None:
         event.content = content
+    if event_image_url is not None:
+        event.event_image_url = event_image_url
     if event_start_at is not None:
         event.event_start_at = event_start_at
     if event_end_at is not None:
@@ -178,4 +186,47 @@ async def delete_bad_calendar_events(db: AsyncSession, *, region_id: int) -> int
     result = await db.execute(delete(Event).where(col(Event.id).in_(matching_ids)))
     await db.flush()
     return int(result.rowcount or 0)
+
+
+async def remove_duplicate_source_events(db: AsyncSession, *, region_id: int) -> int:
+    """Keep one source event per content signature and delete duplicates."""
+    result = await db.execute(
+        select(Event).where(
+            col(Event.region_id) == region_id,
+            col(Event.origin_type) == "source",
+        )
+    )
+    events = list(result.scalars().all())
+    events.sort(
+        key=lambda event: (
+            event.last_seen_at or event.created_at,
+            event.created_at,
+            event.id or 0,
+        ),
+        reverse=True,
+    )
+
+    seen_signatures: set[str] = set()
+    duplicate_ids: list[int] = []
+    for event in events:
+        signature = build_content_signature(
+            title=event.title,
+            content=event.content,
+            venue_name=event.venue_name,
+            neighborhood=event.neighborhood,
+            event_start_iso=event.event_start_at.isoformat() if event.event_start_at else None,
+        )
+        if signature in seen_signatures:
+            if event.id is not None:
+                duplicate_ids.append(event.id)
+            continue
+        seen_signatures.add(signature)
+
+    if not duplicate_ids:
+        return 0
+
+    await db.execute(delete(Trend).where(col(Trend.event_id).in_(duplicate_ids)))
+    deletion = await db.execute(delete(Event).where(col(Event.id).in_(duplicate_ids)))
+    await db.flush()
+    return int(deletion.rowcount or 0)
 

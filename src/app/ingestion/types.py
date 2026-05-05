@@ -14,6 +14,8 @@ class NormalizedEvent:
     title: str
     category: str
     content: str | None
+    organizer_name: str | None
+    event_image_url: str | None
     event_start_at: datetime | None
     event_end_at: datetime | None
     timezone: str

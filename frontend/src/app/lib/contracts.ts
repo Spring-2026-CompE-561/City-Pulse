@@ -22,10 +22,12 @@ export interface EventRead {
   content: string | null;
   source_id: number | null;
   source_name: string | null;
+  organizer_name: string | null;
   origin_type: string;
   external_id: string | null;
   external_url: string | null;
   canonical_url: string | null;
+  event_image_url: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
   timezone: string;
@@ -83,6 +85,7 @@ export interface EventCreateBody {
   venue_address?: string;
   neighborhood?: string;
   price_info?: string;
+  event_image_url?: string;
 }
 
 export interface EventUpdateBody {
@@ -96,10 +99,15 @@ export interface EventUpdateBody {
   venue_address?: string;
   neighborhood?: string;
   price_info?: string;
+  event_image_url?: string;
 }
 
 export interface SuccessResponse {
   success: boolean;
+}
+
+export interface EventImageUploadResponse {
+  url: string;
 }
 
 export interface AppSession {
@@ -118,44 +126,4 @@ export interface EventFilterParams {
   neighborhood?: string;
   starts_after?: string;
   starts_before?: string;
-}
-
-export interface PartnerSubmissionCreateBody {
-  organizer_name: string;
-  organizer_contact?: string;
-  instagram_handle?: string;
-  instagram_post_url?: string;
-  external_event_url?: string;
-  title: string;
-  description?: string;
-  category: string;
-  neighborhood?: string;
-  venue_name?: string;
-  venue_address?: string;
-  event_start_at?: string;
-  event_end_at?: string;
-}
-
-export interface PartnerSubmissionRead {
-  id: number;
-  region_id: number;
-  submitted_by_user_id: number | null;
-  organizer_name: string;
-  organizer_contact: string | null;
-  instagram_handle: string | null;
-  instagram_post_url: string | null;
-  external_event_url: string | null;
-  title: string;
-  description: string | null;
-  category: string;
-  neighborhood: string | null;
-  venue_name: string | null;
-  venue_address: string | null;
-  event_start_at: string | null;
-  event_end_at: string | null;
-  moderation_status: string;
-  moderation_notes: string | null;
-  published_event_id: number | null;
-  created_at: string;
-  reviewed_at: string | null;
 }

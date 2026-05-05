@@ -125,6 +125,7 @@ class EventCreate(BaseModel):
     venue_address: str | None = Field(None, max_length=512)
     neighborhood: str | None = Field(None, max_length=100)
     price_info: str | None = Field(None, max_length=255)
+    event_image_url: str | None = Field(None, max_length=2048)
 
 
 class EventUpdate(BaseModel):
@@ -153,6 +154,7 @@ class EventUpdate(BaseModel):
     venue_address: str | None = Field(None, max_length=512)
     neighborhood: str | None = Field(None, max_length=100)
     price_info: str | None = Field(None, max_length=255)
+    event_image_url: str | None = Field(None, max_length=2048)
 
 
 class EventRead(BaseModel):
@@ -170,10 +172,12 @@ class EventRead(BaseModel):
     content: str | None
     source_id: int | None = None
     source_name: str | None = None
+    organizer_name: str | None = None
     origin_type: str
     external_id: str | None = None
     external_url: str | None = None
     canonical_url: str | None = None
+    event_image_url: str | None = None
     event_start_at: datetime | None = None
     event_end_at: datetime | None = None
     timezone: str
@@ -266,9 +270,11 @@ class EventWithInteractionsRead(BaseModel):
     content: str | None
     source_id: int | None = None
     source_name: str | None = None
+    organizer_name: str | None = None
     origin_type: str
     external_url: str | None = None
     canonical_url: str | None = None
+    event_image_url: str | None = None
     event_start_at: datetime | None = None
     event_end_at: datetime | None = None
     timezone: str
@@ -318,6 +324,12 @@ class SuccessResponse(BaseModel):
 
     # Most endpoints return `{ "success": true }` for simple acknowledgements.
     success: bool = True
+
+
+class EventImageUploadResponse(BaseModel):
+    """Response body for uploaded event media file."""
+
+    url: str
 
 
 # ----- Ingestion / Source Management -----

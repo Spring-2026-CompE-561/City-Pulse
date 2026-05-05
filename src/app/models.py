@@ -104,6 +104,7 @@ class Event(SQLModel, table=True):
     external_id: str | None = Field(default=None, max_length=255)
     external_url: str | None = Field(default=None, max_length=2048)
     canonical_url: str | None = Field(default=None, max_length=2048)
+    event_image_url: str | None = Field(default=None, max_length=2048)
     # Event timing and location metadata.
     event_start_at: datetime | None = Field(
         default=None,
