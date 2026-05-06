@@ -4,8 +4,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { mockUsers } from '../lib/mockData';
-import { setCurrentUser } from '../lib/storage';
+import { getMe, login, register } from '../lib/api';
+import { setSession } from '../lib/storage';
 import { toast } from 'sonner';
 
 interface AuthModalProps {
@@ -16,47 +16,61 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
   const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [signupLocation, setSignupLocation] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Simulate login - match email to mock user
-    const user = mockUsers.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
-    
-    if (user) {
-      setCurrentUser(user);
-      toast.success(`Welcome back, ${user.name}!`);
-      onSuccess();
-      onOpenChange(false);
-    } else {
-      toast.error('User not found. Try: sarah@example.com');
+    try {
+      setIsSubmitting(true);
+      const tokenPair = await login(loginEmail, loginPassword);
+      const currentUser = await getMe(tokenPair.access_token);
+      setSession({
+        accessToken: tokenPair.access_token,
+        refreshToken: tokenPair.refresh_token ?? null,
+        currentUser,
+      });
+      toast.success(`Welcome back, ${currentUser.name}!`);
+      setTimeout(() => {
+          onSuccess();
+          onOpenChange(false);
+      }, 1500);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!signupName || !signupEmail || !signupLocation) {
+    if (!signupName || !signupEmail || !signupPassword) {
       toast.error('Please fill in all fields');
       return;
     }
-
-    // Create new user (in a real app, this would be saved to backend)
-    const newUser = {
-      id: Date.now().toString(),
-      name: signupName,
-      email: signupEmail,
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop`,
-      location: signupLocation,
-    };
-
-    setCurrentUser(newUser);
-    toast.success(`Account created! Welcome, ${newUser.name}!`);
-    onSuccess();
-    onOpenChange(false);
+    try {
+      setIsSubmitting(true);
+      await register(signupName, signupEmail, signupPassword);
+      const tokenPair = await login(signupEmail, signupPassword);
+      const currentUser = await getMe(tokenPair.access_token);
+      setSession({
+        accessToken: tokenPair.access_token,
+        refreshToken: tokenPair.refresh_token ?? null,
+        currentUser,
+      });
+      toast.success(`Account created! Welcome, ${currentUser.name}!`);
+      setTimeout(() => {
+        onSuccess();
+        onOpenChange(false);
+      }, 1500);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Sign up failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -94,15 +108,14 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                   id="login-password"
                   type="password"
                   placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
                 Sign In
               </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Demo: Try sarah@example.com or any mock user email
-              </p>
             </form>
           </TabsContent>
           
@@ -130,25 +143,20 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signup-location">City, State</Label>
-                <Input
-                  id="signup-location"
-                  placeholder="San Francisco, CA"
-                  value={signupLocation}
-                  onChange={(e) => setSignupLocation(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
                 <Input
                   id="signup-password"
                   type="password"
                   placeholder="••••••••"
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
+              <p className="text-xs text-muted-foreground">
+                Sign up creates your account in the backend with city location set to San Diego.
+              </p>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
                 Create Account
               </Button>
             </form>
