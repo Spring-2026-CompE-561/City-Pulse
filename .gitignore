@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .env
 .env.*
+!.env.docker.example
 *.env
 <<<<<<< feat/event-ingestion
 *.txt

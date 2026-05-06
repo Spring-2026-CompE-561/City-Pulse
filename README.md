@@ -110,6 +110,76 @@ City-Pulse/
 
 ---
 
+## Docker (shared team environment)
+
+This repo now includes:
+
+- `docker-compose.yml` (`db` + `backend` + `frontend`)
+- `Dockerfile.backend`
+- `frontend/Dockerfile`
+- `docker/mysql/init/` for one-time DB seed SQL
+
+Use this when you want teammates to use one shared running environment with the same data.
+
+### 1) Create a Docker env file
+
+Create `.env.docker` in the repo root:
+
+```bash
+MYSQL_ROOT_PASSWORD=replace-root-password
+MYSQL_DATABASE=city_pulse
+MYSQL_USER=city_pulse
+MYSQL_PASSWORD=replace-app-password
+JWT_SECRET_KEY=replace-with-32-byte-secret
+INGEST_API_KEY=replace-with-ingest-key
+DEBUG=false
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=7
+JWT_ALGORITHM=HS256
+CORS_ALLOW_ORIGINS=*
+INGEST_SCHEDULER_ENABLED=false
+INGEST_SCHEDULER_INTERVAL_MINUTES=60
+```
+
+### 2) Export your current local MySQL data (one-time seed)
+
+If your local DB already has the state you want teammates to use:
+
+```bash
+mysqldump -h 127.0.0.1 -P 3306 -u city_pulse -p --databases city_pulse > docker/mysql/init/01-city-pulse-seed.sql
+```
+
+Notes:
+
+- Seed scripts run only when the `mysql_data` volume is empty.
+- To re-seed from scratch later:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+### 3) Start the stack
+
+```bash
+docker compose --env-file .env.docker up --build -d
+```
+
+Endpoints:
+
+- Frontend: `http://localhost:3000`
+- Backend docs: `http://localhost:8000/docs`
+
+### 4) Let teammates access simultaneously
+
+Run the stack on one machine (your machine or a VM), then share that machine's reachable address:
+
+- Same LAN: `http://<host-lan-ip>:3000`
+- Internet: expose port `3000` through your cloud/edge tunnel (for example Cloudflare Tunnel, Tailscale Funnel, or reverse proxy)
+
+All teammates will hit the same frontend and backend instance, and therefore the same MySQL data.
+
+---
+
 ## Optional: pip workflow (alternative to uv)
 
 ```bash
