@@ -1,12 +1,18 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { getMe, login, register } from '../lib/api';
-import { setSession } from '../lib/storage';
-import { toast } from 'sonner';
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { getMe, login, register } from "../lib/api";
+import { setSession } from "../lib/storage";
+import { toast } from "sonner";
 
 interface AuthModalProps {
   open: boolean;
@@ -15,11 +21,11 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,10 +40,12 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         currentUser,
       });
       toast.success(`Welcome back, ${currentUser.name}!`);
-      onSuccess();
-      onOpenChange(false);
+      setTimeout(() => {
+        onSuccess();
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
+      toast.error(error instanceof Error ? error.message : "Login failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -46,7 +54,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signupName || !signupEmail || !signupPassword) {
-      toast.error('Please fill in all fields');
+      toast.error("Please fill in all fields");
       return;
     }
     try {
@@ -60,10 +68,12 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         currentUser,
       });
       toast.success(`Account created! Welcome, ${currentUser.name}!`);
-      onSuccess();
-      onOpenChange(false);
+      setTimeout(() => {
+        onSuccess();
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Sign up failed');
+      toast.error(error instanceof Error ? error.message : "Sign up failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -75,16 +85,17 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         <DialogHeader>
           <DialogTitle>Welcome to CityPulse</DialogTitle>
           <DialogDescription>
-            Sign in or create an account to discover and attend events in your city
+            Sign in or create an account to discover and attend events in your
+            city
           </DialogDescription>
         </DialogHeader>
-        
+
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="login">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
@@ -114,7 +125,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
               </Button>
             </form>
           </TabsContent>
-          
+
           <TabsContent value="signup">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
@@ -150,7 +161,8 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Sign up creates your account in the backend with city location set to San Diego.
+                Sign up creates your account in the backend with city location
+                set to San Diego.
               </p>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 Create Account
