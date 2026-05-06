@@ -1,53 +1,67 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router';
-import { EventCard } from '../components/EventCard';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { mockEvents, cities, categories } from '../lib/mockData';
-import { getCurrentUser, setCurrentUser, getCustomEvents } from '../lib/storage';
-import { Search, TrendingUp, LogOut, User, Filter, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import logoImage from '../../imports/CityPulse_Logo.png';
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router";
+import { EventCard } from "../components/EventCard";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { mockEvents, cities, categories } from "../lib/mockData";
+import {
+  getCurrentUser,
+  setCurrentUser,
+  getCustomEvents,
+} from "../lib/storage";
+import { Search, TrendingUp, LogOut, User, Filter, Plus } from "lucide-react";
+import { toast } from "sonner";
+import logoImage from "../../imports/CityPulse_Logo.png";
 
 export function Feed() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCity, setSelectedCity] = useState('All Cities');
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("All Cities");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     setUser(currentUser);
     if (!currentUser) {
-      navigate('/');
+      navigate("/");
     }
   }, [navigate]);
 
   const handleLogout = () => {
     setCurrentUser(null);
-    toast.success('Logged out successfully');
-    navigate('/');
+    toast.success("Logged out successfully");
+    navigate("/");
   };
 
   // Combine mock events with custom events from localStorage
   const customEvents = getCustomEvents();
   const allEvents = [...customEvents, ...mockEvents];
 
-  const filteredEvents = allEvents.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCity = selectedCity === 'All Cities' || event.city === selectedCity;
-    const matchesCategory = selectedCategory === 'All Categories' || event.category === selectedCategory;
-    
+  const filteredEvents = allEvents.filter((event) => {
+    const matchesSearch =
+      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCity =
+      selectedCity === "All Cities" || event.city === selectedCity;
+    const matchesCategory =
+      selectedCategory === "All Categories" ||
+      event.category === selectedCategory;
+
     return matchesSearch && matchesCity && matchesCategory;
   });
 
-  const trendingEvents = filteredEvents.filter(e => e.trending);
+  const trendingEvents = filteredEvents.filter((e) => e.trending);
 
   if (!user) return null;
 
@@ -59,12 +73,16 @@ export function Feed() {
           <div className="flex items-center justify-between">
             <Link to="/feed" className="flex items-center gap-3">
               <img src={logoImage} alt="CityPulse Logo" className="w-8 h-8" />
-              <span className="text-2xl font-bold" style={{ 
-                background: 'linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
-              }}>
+              <span
+                className="text-2xl font-bold"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
                 CityPulse
               </span>
             </Link>
@@ -89,18 +107,18 @@ export function Feed() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
               Welcome back, {user.name}!
             </h1>
             <p className="text-muted-foreground">
               Discover events happening in {user.location}
             </p>
           </div>
-          <Button onClick={() => navigate('/create')} className="gap-2">
+          <Button onClick={() => navigate("/create")} className="gap-2">
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create Event</span>
+            <span className="sm:inline">Create Event</span>
           </Button>
         </div>
 
@@ -127,13 +145,14 @@ export function Feed() {
                 <Filter className="w-4 h-4" />
                 Filters
               </Button>
-              {(selectedCity !== 'All Cities' || selectedCategory !== 'All Categories') && (
+              {(selectedCity !== "All Cities" ||
+                selectedCategory !== "All Categories") && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setSelectedCity('All Cities');
-                    setSelectedCategory('All Categories');
+                    setSelectedCity("All Cities");
+                    setSelectedCategory("All Categories");
                   }}
                 >
                   Clear Filters
@@ -161,7 +180,10 @@ export function Feed() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -198,12 +220,14 @@ export function Feed() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold">
-              {selectedCity !== 'All Cities' || selectedCategory !== 'All Categories' 
-                ? 'Filtered Events' 
-                : 'All Events'}
+              {selectedCity !== "All Cities" ||
+              selectedCategory !== "All Categories"
+                ? "Filtered Events"
+                : "All Events"}
             </h2>
             <Badge variant="secondary">
-              {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'}
+              {filteredEvents.length}{" "}
+              {filteredEvents.length === 1 ? "Event" : "Events"}
             </Badge>
           </div>
 
@@ -216,9 +240,9 @@ export function Feed() {
               </p>
               <Button
                 onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCity('All Cities');
-                  setSelectedCategory('All Categories');
+                  setSearchQuery("");
+                  setSelectedCity("All Cities");
+                  setSelectedCategory("All Categories");
                 }}
               >
                 Clear All Filters
