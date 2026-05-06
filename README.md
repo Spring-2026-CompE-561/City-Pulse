@@ -110,6 +110,68 @@ City-Pulse/
 
 ---
 
+## Docker (recommended for full-stack)
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### Start all services
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- **MySQL 8.0** on port `33060` (internal `3306`)
+- **FastAPI backend** on port `8000`
+- **Next.js frontend** on port `3000`
+
+### Environment
+
+The following environment variables are pre-configured in `docker-compose.yml`:
+
+| Variable | Value |
+|----------|-------|
+| `MYSQL_HOST` | `db` |
+| `MYSQL_PORT` | `3306` |
+| `MYSQL_USER` | `root` |
+| `MYSQL_PASSWORD` | `root` |
+| `MYSQL_DATABASE` | `city_pulse` |
+| `JWT_SECRET_KEY` | `change-me-in-production-at-least-32-bytes` |
+| `INGEST_API_KEY` | `admin-secret-key` |
+| `DEBUG` | `true` |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` |
+
+### Access services
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+
+### Stop services
+
+```bash
+docker compose down
+```
+
+To also remove volumes (reset database):
+
+```bash
+docker compose down -v
+```
+
+To rebuild after code changes:
+
+```bash
+docker compose up -d --build
+```
+
+---
+
 ## Optional: pip workflow (alternative to uv)
 
 ```bash
