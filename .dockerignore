@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+frontend/node_modules
+frontend/.next
+frontend/test-results
+frontend/playwright-report
+agent-transcripts
+terminals

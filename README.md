@@ -1,6 +1,6 @@
 # City Pulse
 
-Location-based events + trends platform (backend API). Users can register/login, create events (currently **San Diego only**), interact (likes/comments/attending), and view a ranked “trending” list driven by interactions.
+Location-based events + trends platform (backend API). Users can register/login, create events (currently **San Diego only**), interact (likes/comments/attending), and view a ranked “trending” list driven by interactions. The platform now supports source-based ingestion for nightlife/music listings and official-only partner submissions for public/charity/flea events.
 
 ---
 
@@ -61,20 +61,18 @@ City-Pulse/
 
 ## Run the project
 
-### Local setup (Windows / PowerShell)
+### Local setup (Windows / PowerShell, uv-first)
 
-1. **Create and activate a virtual environment**:
+1. **Install dependencies with uv** (from repo root):
 
    ```bash
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
+   uv sync --extra dev
    ```
 
-2. **Install dependencies** (from repo root):
+2. **Activate environment**:
 
    ```bash
-   pip install -e .
-   pip install -r requirements.txt
+   .\.venv\Scripts\Activate.ps1
    ```
 
 3. **Configure environment** (MySQL):
@@ -95,11 +93,101 @@ City-Pulse/
    - Swagger UI: `http://127.0.0.1:8000/docs`
    - OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
-6. **Run tests**:
+6. **Run backend unit tests with enforced coverage (>=50%)**:
 
    ```bash
    pytest
    ```
+
+7. **Run frontend-backend integration test**:
+
+   ```bash
+   cd frontend
+   npm install
+   npm run test:integration:install
+   npm run test:integration
+   ```
+
+---
+
+## Docker (shared team environment)
+
+This repo now includes:
+
+- `docker-compose.yml` (`db` + `backend` + `frontend`)
+- `Dockerfile.backend`
+- `frontend/Dockerfile`
+- `docker/mysql/init/` for one-time DB seed SQL
+
+Use this when you want teammates to use one shared running environment with the same data.
+
+### 1) Create a Docker env file
+
+Create `.env.docker` in the repo root:
+
+```bash
+MYSQL_ROOT_PASSWORD=replace-root-password
+MYSQL_DATABASE=city_pulse
+MYSQL_USER=city_pulse
+MYSQL_PASSWORD=replace-app-password
+JWT_SECRET_KEY=replace-with-32-byte-secret
+INGEST_API_KEY=replace-with-ingest-key
+DEBUG=false
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=7
+JWT_ALGORITHM=HS256
+CORS_ALLOW_ORIGINS=*
+INGEST_SCHEDULER_ENABLED=false
+INGEST_SCHEDULER_INTERVAL_MINUTES=60
+```
+
+### 2) Export your current local MySQL data (one-time seed)
+
+If your local DB already has the state you want teammates to use:
+
+```bash
+mysqldump -h 127.0.0.1 -P 3306 -u city_pulse -p --databases city_pulse > docker/mysql/init/01-city-pulse-seed.sql
+```
+
+Notes:
+
+- Seed scripts run only when the `mysql_data` volume is empty.
+- To re-seed from scratch later:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+### 3) Start the stack
+
+```bash
+docker compose --env-file .env.docker up --build -d
+```
+
+Endpoints:
+
+- Frontend: `http://localhost:3000`
+- Backend docs: `http://localhost:8000/docs`
+
+### 4) Let teammates access simultaneously
+
+Run the stack on one machine (your machine or a VM), then share that machine's reachable address:
+
+- Same LAN: `http://<host-lan-ip>:3000`
+- Internet: expose port `3000` through your cloud/edge tunnel (for example Cloudflare Tunnel, Tailscale Funnel, or reverse proxy)
+
+All teammates will hit the same frontend and backend instance, and therefore the same MySQL data.
+
+---
+
+## Optional: pip workflow (alternative to uv)
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e .
+pip install -r requirements.txt
+```
 
 ---
 
@@ -132,6 +220,10 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 | `JWT_SECRET_KEY` | `change-me-in-production-at-least-32-bytes` | Secret key used to sign and verify JWT access/refresh tokens. |
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
 | `CORS_ALLOW_ORIGINS` | `*` | `*` or comma-separated allowed origins for CORS. |
+| `INGEST_API_KEY` | *(required for admin ingestion endpoints)* | Header `X-Ingest-Key` value for source/ingest moderation routes. |
+| `INGEST_SCHEDULER_ENABLED` | `false` | Enables periodic ingestion in app process. |
+| `INGEST_SCHEDULER_INTERVAL_MINUTES` | `60` | Scheduler interval, minimum 5 minutes. |
+| `SKIP_DB_INIT` | `false` | If `true`, skips startup DB initialization (used by integration test harness). |
 
 **Startup behavior**: on app startup it creates tables (if missing) and seeds the default region data.
 
@@ -144,6 +236,7 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 - **`GET /`**: service info + quick list of API prefixes
 - **`GET /docs`**: Swagger UI
 - **`GET /openapi.json`**: OpenAPI schema
+- **`GET /api/health`**: lightweight health endpoint used by integration tests
 
 ### Auth (`/api/auth`)
 
@@ -168,16 +261,16 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 ### Events (`/api/events`)
 
 - **`GET /api/events?region=san%20diego&skip=0&limit=50`**
-- **`GET /api/events?region=san%20diego&category=All%20Categories&skip=0&limit=50`**
-- **`GET /api/events/categories`**: dropdown options (`All Categories`, `Technology`, `Arts & Culture`, `Environment`, `Entertainment`, `Business`, `Food & Drink`, `Health & Wellness`, `Music`)
+- **`GET /api/events?region=san%20diego&category=All%20Categories&neighborhood=North%20Park&starts_after=2026-04-21T00:00:00Z&skip=0&limit=50`**
+- **`GET /api/events/categories`**: dropdown options (`All Categories`, `Technology`, `Arts & Culture`, `Environment`, `Entertainment`, `Business`, `Food & Drink`, `Health & Wellness`, `Music`, `Nightlife`, `Charity & Causes`, `Community`)
 - **`GET /api/events/{id}`**
-- **`POST /api/events`**: create event for a user (user must be in the San Diego region) with required `category`
+- **`POST /api/events`**: create event for a user (user must be in the San Diego region) with optional event metadata (`event_start_at`, `venue_name`, `neighborhood`, `price_info`, etc.)
 - **`PUT /api/events/{id}`**
 - **`DELETE /api/events/{id}`**
 
 ### Interactions (`/api/interactions`)
 
-- **`GET /api/interactions?region=san%20diego&skip=0&limit=50`**: returns events with likes/comments/attendance counts + comment list
+- **`GET /api/interactions?region=san%20diego&category=Nightlife&neighborhood=Gaslamp&starts_after=...&skip=0&limit=50`**: returns events with likes/comments/attendance counts + comment list
 - **`PUT /api/interactions/events/{event_id}/likes`**
 - **`DELETE /api/interactions/events/{event_id}/likes?user_id=...`**
 - **`PUT /api/interactions/events/{event_id}/comments`**
@@ -188,8 +281,43 @@ Create a `.env` file in the repo root (or export env vars) to configure the data
 ### Trends (`/api/trends`)
 
 - **`GET /api/trends?region=san%20diego&skip=0&limit=50`**: ranked by interactions (attendance first, then comments, then likes)
-- **`POST /api/trends`**: rebuild trend list from current interactions
-- **`PUT /api/trends`**: upsert an event in trends and reorder
+- **`POST /api/trends`**: rebuild trend list from current interactions (**requires `X-Ingest-Key`**)
+- **`PUT /api/trends`**: upsert an event in trends and reorder (**requires `X-Ingest-Key`**)
+
+### Sources (`/api/sources`)
+
+- **`GET /api/sources`**: list active configured sources (requires `X-Ingest-Key`)
+- **`GET /api/sources/{source_id}`**: source details (requires `X-Ingest-Key`)
+
+### Ingestion (`/api/ingest`)
+
+- **`POST /api/ingest/run`**: run ingestion for one source or filtered area (requires `X-Ingest-Key`)
+- **`POST /api/ingest/run-all`**: run ingestion for all active sources (requires `X-Ingest-Key`)
+- **`GET /api/ingest/runs`**: recent ingestion runs and parser errors (requires `X-Ingest-Key`)
+
+Backend command alternative:
+
+- `city-pulse-ingest`
+- `city-pulse-ingest --area "North Park"`
+- `city-pulse-ingest --source-id 2 --start-date 2026-05-01T00:00:00Z --end-date 2026-05-31T23:59:59Z`
+- One-time image backfill for existing source events:
+  - `city-pulse-backfill-images`
+  - `city-pulse-backfill-images --limit 500`
+
+### Partner submissions (`/api/partner-submissions`)
+
+- **`POST /api/partner-submissions`**: authenticated submission path for Instagram/public event links (official-only workflow)
+- **`GET /api/partner-submissions`**: moderation queue view (requires `X-Ingest-Key`)
+- **`PUT /api/partner-submissions/{submission_id}/review`**: approve/reject and optionally publish event (requires `X-Ingest-Key`)
+
+---
+
+## Ingestion and migration workflow
+
+- SQL migrations live in `src/migrations/*.sql`.
+- On startup, `init_db()` creates `schema_migrations` and applies new SQL scripts once.
+- Default San Diego nightlife/music source records are seeded when no sources exist.
+- Compliance rules are documented in `SCRAPING_POLICY.md`.
 
 ---
 

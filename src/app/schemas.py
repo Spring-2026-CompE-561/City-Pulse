@@ -113,8 +113,19 @@ class EventCreate(BaseModel):
         "Food & Drink",
         "Health & Wellness",
         "Music",
+        "Nightlife",
+        "Charity & Causes",
+        "Community",
     ] = Field(..., description="Category selected from the frontend dropdown options.")
     content: str | None = Field(None, max_length=10000)
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    timezone: str = Field(default="America/Los_Angeles", max_length=100)
+    venue_name: str | None = Field(None, max_length=255)
+    venue_address: str | None = Field(None, max_length=512)
+    neighborhood: str | None = Field(None, max_length=100)
+    price_info: str | None = Field(None, max_length=255)
+    event_image_url: str | None = Field(None, max_length=2048)
 
 
 class EventUpdate(BaseModel):
@@ -131,8 +142,19 @@ class EventUpdate(BaseModel):
         "Food & Drink",
         "Health & Wellness",
         "Music",
+        "Nightlife",
+        "Charity & Causes",
+        "Community",
     ] | None = Field(None, description="Updated category from the frontend dropdown options.")
     content: str | None = None
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    timezone: str | None = Field(None, max_length=100)
+    venue_name: str | None = Field(None, max_length=255)
+    venue_address: str | None = Field(None, max_length=512)
+    neighborhood: str | None = Field(None, max_length=100)
+    price_info: str | None = Field(None, max_length=255)
+    event_image_url: str | None = Field(None, max_length=2048)
 
 
 class EventRead(BaseModel):
@@ -144,9 +166,30 @@ class EventRead(BaseModel):
     id: int
     region_id: int
     user_id: int | None
+    user_name: str | None = None
     title: str
     category: str
     content: str | None
+    source_id: int | None = None
+    source_name: str | None = None
+    organizer_name: str | None = None
+    origin_type: str
+    external_id: str | None = None
+    external_url: str | None = None
+    canonical_url: str | None = None
+    event_image_url: str | None = None
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    timezone: str
+    venue_name: str | None = None
+    venue_address: str | None = None
+    neighborhood: str | None = None
+    city: str
+    price_info: str | None = None
+    promo_summary: str | None = None
+    tags_json: str | None = None
+    source_confidence: float | None = None
+    last_seen_at: datetime | None = None
     created_at: datetime
 
 
@@ -164,6 +207,9 @@ class EventCategoryOptionsResponse(BaseModel):
             "Food & Drink",
             "Health & Wellness",
             "Music",
+            "Nightlife",
+            "Charity & Causes",
+            "Community",
         ]
     )
 
@@ -204,6 +250,7 @@ class CommentRead(BaseModel):
     id: int
     user_id: int
     event_id: int
+    user_name: str | None = None
     text: str
     created_at: datetime
 
@@ -217,9 +264,28 @@ class EventWithInteractionsRead(BaseModel):
     id: int
     region_id: int
     user_id: int | None
+    user_name: str | None = None
     title: str
     category: str
     content: str | None
+    source_id: int | None = None
+    source_name: str | None = None
+    organizer_name: str | None = None
+    origin_type: str
+    external_url: str | None = None
+    canonical_url: str | None = None
+    event_image_url: str | None = None
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+    timezone: str
+    venue_name: str | None = None
+    venue_address: str | None = None
+    neighborhood: str | None = None
+    city: str
+    price_info: str | None = None
+    promo_summary: str | None = None
+    source_confidence: float | None = None
+    last_seen_at: datetime | None = None
     created_at: datetime
     likes_count: int = 0
     comments_count: int = 0
@@ -258,3 +324,118 @@ class SuccessResponse(BaseModel):
 
     # Most endpoints return `{ "success": true }` for simple acknowledgements.
     success: bool = True
+
+
+class EventImageUploadResponse(BaseModel):
+    """Response body for uploaded event media file."""
+
+    url: str
+
+
+# ----- Ingestion / Source Management -----
+class SourceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    region_id: int
+    name: str
+    domain: str
+    base_url: str
+    source_type: str
+    category_hint: str | None
+    neighborhood: str | None
+    is_active: bool
+    crawl_allowed: bool
+    crawl_delay_seconds: int
+    rate_limit_per_min: int
+    attribution_text: str | None
+    robots_txt_url: str | None
+    terms_url: str | None
+    parse_strategy: str
+
+
+class IngestRunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    region_id: int
+    source_id: int | None
+    trigger_type: str
+    status: str
+    fetched_count: int
+    inserted_count: int
+    updated_count: int
+    skipped_count: int
+    error_count: int
+    area: str | None
+    error_summary: str | None
+    started_at: datetime
+    completed_at: datetime | None
+
+
+class IngestRunRequest(BaseModel):
+    source_id: int | None = Field(None, description="Optional source id. Omit to run all active sources.")
+    area: str | None = Field(None, max_length=100, description="Neighborhood focus such as North Park.")
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+class PartnerSubmissionCreate(BaseModel):
+    organizer_name: str = Field(..., min_length=1, max_length=255)
+    organizer_contact: str | None = Field(None, max_length=255)
+    instagram_handle: str | None = Field(None, max_length=255)
+    instagram_post_url: str | None = Field(None, max_length=2048)
+    external_event_url: str | None = Field(None, max_length=2048)
+    title: str = Field(..., min_length=1, max_length=512)
+    description: str | None = None
+    category: Literal[
+        "Technology",
+        "Arts & Culture",
+        "Environment",
+        "Entertainment",
+        "Business",
+        "Food & Drink",
+        "Health & Wellness",
+        "Music",
+        "Nightlife",
+        "Charity & Causes",
+        "Community",
+    ] = "Arts & Culture"
+    neighborhood: str | None = Field(None, max_length=100)
+    venue_name: str | None = Field(None, max_length=255)
+    venue_address: str | None = Field(None, max_length=512)
+    event_start_at: datetime | None = None
+    event_end_at: datetime | None = None
+
+
+class PartnerSubmissionReview(BaseModel):
+    moderation_status: Literal["approved", "rejected"] = Field(
+        ..., description="Review decision."
+    )
+    moderation_notes: str | None = None
+
+
+class PartnerSubmissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    region_id: int
+    submitted_by_user_id: int | None
+    organizer_name: str
+    organizer_contact: str | None
+    instagram_handle: str | None
+    instagram_post_url: str | None
+    external_event_url: str | None
+    title: str
+    description: str | None
+    category: str
+    neighborhood: str | None
+    venue_name: str | None
+    venue_address: str | None
+    event_start_at: datetime | None
+    event_end_at: datetime | None
+    moderation_status: str
+    moderation_notes: str | None
+    published_event_id: int | None
+    created_at: datetime
+    reviewed_at: datetime | None
