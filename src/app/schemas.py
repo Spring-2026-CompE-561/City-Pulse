@@ -126,6 +126,7 @@ class EventCreate(BaseModel):
     neighborhood: str | None = Field(None, max_length=100)
     price_info: str | None = Field(None, max_length=255)
     event_image_url: str | None = Field(None, max_length=2048)
+    organizer_name: str | None = Field(None, min_length=1, max_length=255)
 
 
 class EventUpdate(BaseModel):

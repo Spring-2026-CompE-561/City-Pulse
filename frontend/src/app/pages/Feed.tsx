@@ -14,6 +14,8 @@ import { Search, TrendingUp, LogOut, Filter, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from '../../imports/CityPulse_Logo.png';
 
+const EVENTS_PER_PAGE = 9;
+
 export function Feed() {
   const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
@@ -28,6 +30,7 @@ export function Feed() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   function startsAfterIsoFromDateInput(value: string): string | undefined {
     if (!value.trim()) {
@@ -123,8 +126,27 @@ export function Feed() {
     const matchesCity = selectedCity === 'San Diego, CA' || event.city === selectedCity;
     return matchesSearch && matchesCity;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
+  const pageStartIndex = (currentPage - 1) * EVENTS_PER_PAGE;
+  const paginatedEvents = filteredEvents.slice(pageStartIndex, pageStartIndex + EVENTS_PER_PAGE);
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, startPage + 4);
+  const visiblePageNumbers: number[] = [];
+  for (let pageNumber = Math.max(1, endPage - 4); pageNumber <= endPage; pageNumber += 1) {
+    visiblePageNumbers.push(pageNumber);
+  }
 
   const trendingEvents = filteredEvents.filter((event) => event.trending);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedNeighborhood, startDate]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   if (loading) {
     return (
@@ -233,6 +255,7 @@ export function Feed() {
                     setSelectedCategory('All Categories');
                     setSelectedNeighborhood('All Neighborhoods');
                     setStartDate('');
+                    setCurrentPage(1);
                     setRefreshToken((value) => value + 1);
                   }}
                 >
@@ -337,17 +360,50 @@ export function Feed() {
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedCategory('All Categories');
+                  setCurrentPage(1);
                 }}
               >
                 Clear All Filters
               </Button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
+            <>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+              {filteredEvents.length > EVENTS_PER_PAGE && (
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  {visiblePageNumbers.map((pageNumber) => (
+                    <Button
+                      key={pageNumber}
+                      variant={pageNumber === currentPage ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

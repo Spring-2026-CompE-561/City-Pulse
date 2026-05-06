@@ -138,6 +138,7 @@ def test_create_event_without_trailing_slash_succeeds(monkeypatch):
         venue_address,
         neighborhood,
         price_info,
+        tags_json=None,
     ):
         return Event(
             id=11,
@@ -171,6 +172,65 @@ def test_create_event_without_trailing_slash_succeeds(monkeypatch):
     app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json()["id"] == 11
+
+
+def test_create_event_accepts_custom_organizer_label(monkeypatch):
+    captured_tags_json = None
+
+    async def _fake_create_event(
+        _db,
+        *,
+        region_id,
+        user_id,
+        title,
+        category,
+        content,
+        event_image_url,
+        event_start_at,
+        event_end_at,
+        timezone,
+        venue_name,
+        venue_address,
+        neighborhood,
+        price_info,
+        tags_json=None,
+    ):
+        nonlocal captured_tags_json
+        captured_tags_json = tags_json
+        return Event(
+            id=12,
+            region_id=region_id,
+            user_id=user_id,
+            title=title,
+            category=category,
+            content=content,
+            event_image_url=event_image_url,
+            created_at=datetime.now(UTC),
+            event_start_at=event_start_at,
+            event_end_at=event_end_at,
+            timezone=timezone,
+            venue_name=venue_name,
+            venue_address=venue_address,
+            neighborhood=neighborhood,
+            price_info=price_info,
+            tags_json=tags_json,
+        )
+
+    monkeypatch.setattr(events_router_module, "create_event_row", _fake_create_event)
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/api/events",
+        json={
+            "user_id": 1,
+            "title": "Community Cleanup",
+            "category": "Community",
+            "content": "body",
+            "organizer_name": "North Park Community Council",
+        },
+    )
+    app.dependency_overrides.clear()
+    assert response.status_code == 201
+    assert captured_tags_json == '{"organizer_name": "North Park Community Council"}'
 
 
 def test_update_event_not_found(monkeypatch):

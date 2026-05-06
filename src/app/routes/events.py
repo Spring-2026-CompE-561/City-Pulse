@@ -1,6 +1,7 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
 from datetime import datetime
+import json
 from pathlib import Path as FilePath
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_required
 from app.database import get_db
-from app.event_metadata import clean_event_description, extract_organizer_name
+from app.event_metadata import clean_event_description, clean_organizer_name, extract_organizer_name
 from app.event_categories import (
     ALL_CATEGORIES_OPTION,
     ALLOWED_EVENT_CATEGORIES,
@@ -122,9 +123,8 @@ async def get_event(
     if not event:
         raise not_found("Event not found")
     organizer_name = (
-        event.user.name
-        if event.user is not None
-        else extract_organizer_name(event.tags_json)
+        extract_organizer_name(event.tags_json)
+        or (event.user.name if event.user is not None else None)
         or event.venue_name
         or (event.source.name if event.source else None)
     )
@@ -187,6 +187,7 @@ async def create_event(
     # for a persisted user row (and for `events.user_id` to reference it).
     if user.id is None:
         raise RuntimeError("User id missing from database record")
+    normalized_organizer_name = clean_organizer_name(payload.organizer_name)
     event = await create_event_row(
         db,
         region_id=user.region_id,
@@ -202,6 +203,11 @@ async def create_event(
         venue_address=payload.venue_address,
         neighborhood=payload.neighborhood,
         price_info=payload.price_info,
+        tags_json=(
+            json.dumps({"organizer_name": normalized_organizer_name})
+            if normalized_organizer_name is not None
+            else None
+        ),
     )
     return event
 

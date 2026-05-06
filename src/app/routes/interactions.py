@@ -119,9 +119,8 @@ async def list_events_with_interactions(
             source = await get_source_by_id(db, ev.source_id)
             source_name = source.name if source is not None else None
         organizer_name = (
-            ev.user.name
-            if ev.user is not None
-            else extract_organizer_name(ev.tags_json)
+            extract_organizer_name(ev.tags_json)
+            or (ev.user.name if ev.user is not None else None)
             or ev.venue_name
             or source_name
         )

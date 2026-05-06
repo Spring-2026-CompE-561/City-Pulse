@@ -30,6 +30,7 @@ export function CreateEvent() {
   ]);
   const [formData, setFormData] = useState({
     title: '',
+    organizerName: '',
     description: '',
     category: '',
     neighborhood: '',
@@ -89,6 +90,7 @@ export function CreateEvent() {
       await createEvent({
         user_id: user.id,
         title: formData.title,
+        organizer_name: formData.organizerName.trim() || undefined,
         category: formData.category,
         content: formData.description,
         neighborhood: formData.neighborhood || undefined,
@@ -209,6 +211,20 @@ export function CreateEvent() {
                   onChange={(e) => handleChange('title', e.target.value)}
                   required
                 />
+              </div>
+
+              {/* Organizer Label */}
+              <div className="space-y-2">
+                <Label htmlFor="organizerName">Organizer Label</Label>
+                <Input
+                  id="organizerName"
+                  placeholder="e.g., UC San Diego IEEE, North Park Community Council"
+                  value={formData.organizerName}
+                  onChange={(e) => handleChange('organizerName', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Use this when you are posting on behalf of another organizer.
+                </p>
               </div>
 
               {/* Description */}

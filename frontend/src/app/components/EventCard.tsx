@@ -18,9 +18,10 @@ export function EventCard({ event }: EventCardProps) {
     ? (uploadedImage ?? CATEGORY_IMAGES[event.category] ?? DEFAULT_CATEGORY_IMAGE)
     : null;
 
-  const organizerLabel = event.origin_type === 'user'
-    ? (event.user_name ?? `user #${event.user_id ?? 'unknown'}`)
-    : (event.organizer_name ?? event.venue_name ?? event.user_name ?? 'Event Organizer');
+  const organizerLabel = event.organizer_name
+    ?? event.user_name
+    ?? event.venue_name
+    ?? `user #${event.user_id ?? 'unknown'}`;
 
   return (
     <Link href={`/event/${event.id}`}>
