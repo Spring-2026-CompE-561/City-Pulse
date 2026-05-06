@@ -5,7 +5,15 @@ __pycache__/
 .env
 .env.*
 *.env
+<<<<<<< feat/event-ingestion
 *.txt
+=======
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+>>>>>>> main
 # Database files and dumps
 *.db
 *.sqlite
