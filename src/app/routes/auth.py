@@ -8,7 +8,7 @@ from app.auth import decode_refresh_token, get_current_user, get_current_user_re
 from app.database import get_db
 from app.exceptions import bad_request, conflict, unauthorized
 from app.models import User
-from app.repositories.user_repository import delete_user_and_events
+from app.repository.user import delete_user_and_events
 from app.schemas import LoginRequest, RefreshRequest, SuccessResponse, UserCreate, UserDeleteBody, UserRead
 from app.services.auth_service import (
     build_token_pair,

@@ -5,13 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.region_map import parse_region_param
-from app.repositories.region_repository import (
+from app.repository.region import (
     list_events_in_region as list_region_events,
 )
-from app.repositories.region_repository import (
+from app.repository.region import (
     list_regions as list_all_regions,
 )
-from app.repositories.region_repository import (
+from app.repository.region import (
     list_users_in_region as list_region_users,
 )
 from app.routes.users import _user_to_read

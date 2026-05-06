@@ -16,12 +16,16 @@ Called by / import relationships
 """
 
 from collections.abc import AsyncGenerator
+from pathlib import Path
+import re
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
 from app.config import settings
+from app.ingestion.source_registry import build_default_sources
+from app.models import Source
 from app.region_map import REGION_SAN_DIEGO_ID
 
 # Resolved URL is set by the `Settings` validator (MySQL). Kept module-private on purpose.
@@ -30,22 +34,26 @@ _database_url: str = settings.database_url or ""
 
 # The global async engine shared across the app process.
 # Used by: `async_sessionmaker(...)` to create request sessions.
-engine = create_async_engine(
-    _database_url,
-    echo=settings.debug,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+if settings.skip_db_init:
+    engine = None
+    async_session_maker = None
+else:
+    engine = create_async_engine(
+        _database_url,
+        echo=settings.debug,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
 
-# Session factory used by `get_db()` to create an `AsyncSession` per request.
-async_session_maker = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+    # Session factory used by `get_db()` to create an `AsyncSession` per request.
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -62,6 +70,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Called by
     - Routers and dependencies via `Depends(get_db)`.
     """
+    if async_session_maker is None:
+        raise RuntimeError("Database session factory is unavailable when SKIP_DB_INIT is enabled.")
     async with async_session_maker() as session:
         try:
             # The caller uses this session for all ORM queries/flushes.
@@ -88,6 +98,8 @@ async def init_db() -> None:
     Called by
     - `app.main.lifespan()` during application startup.
     """
+    if engine is None or async_session_maker is None:
+        return
     async with engine.begin() as conn:
         # Create all tables for all SQLModel models (Region, User, Event, etc).
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -100,6 +112,16 @@ async def init_db() -> None:
                 text(
                     "ALTER TABLE events "
                     "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Technology'"
+                )
+            )
+        event_image_column = await conn.execute(
+            text("SHOW COLUMNS FROM events LIKE 'event_image_url'")
+        )
+        if event_image_column.first() is None:
+            await conn.execute(
+                text(
+                    "ALTER TABLE events "
+                    "ADD COLUMN event_image_url VARCHAR(2048) NULL"
                 )
             )
         # Ensure San Diego exists. Prefer id=0 for consistency, but don't create
@@ -124,3 +146,171 @@ async def init_db() -> None:
                 text("INSERT IGNORE INTO regions (id, name) VALUES (:id, :name)"),
                 {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
             )
+        await _run_sql_migrations(conn)
+
+    async with async_session_maker() as session:
+        await _seed_default_sources(session)
+        await session.commit()
+
+
+async def _run_sql_migrations(conn) -> None:
+    migrations_dir = Path(__file__).resolve().parents[1] / "migrations"
+    if not migrations_dir.exists():
+        return
+    await conn.execute(
+        text(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "id VARCHAR(255) PRIMARY KEY,"
+            "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )
+    )
+    existing_rows = await conn.execute(text("SELECT id FROM schema_migrations"))
+    applied = {row[0] for row in existing_rows.all()}
+    for path in sorted(migrations_dir.glob("*.sql")):
+        migration_id = path.name
+        if migration_id in applied:
+            continue
+        sql = path.read_text(encoding="utf-8").strip()
+        if not sql:
+            await conn.execute(
+                text("INSERT INTO schema_migrations (id) VALUES (:id)"),
+                {"id": migration_id},
+            )
+            continue
+        statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+        for statement in statements:
+            await _execute_migration_statement(conn, statement)
+        await conn.execute(
+            text("INSERT INTO schema_migrations (id) VALUES (:id)"),
+            {"id": migration_id},
+        )
+
+
+async def _execute_migration_statement(conn: AsyncConnection, statement: str) -> None:
+    column_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD COLUMN\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s+",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if column_match is not None:
+        table_name, column_name = column_match.group(1), column_match.group(2)
+        if await _column_exists(conn, table_name, column_name):
+            return
+        await conn.execute(text(_strip_if_not_exists(statement)))
+        return
+
+    index_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD INDEX\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s*\(",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if index_match is not None:
+        table_name, index_name = index_match.group(1), index_match.group(2)
+        if await _index_exists(conn, table_name, index_name):
+            return
+        await conn.execute(text(_strip_if_not_exists(statement)))
+        return
+
+    constraint_match = re.search(
+        r"ALTER TABLE\s+`?(\w+)`?\s+ADD CONSTRAINT\s+`?(\w+)`?\s+",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if constraint_match is not None:
+        table_name, constraint_name = constraint_match.group(1), constraint_match.group(2)
+        if await _constraint_exists(conn, table_name, constraint_name):
+            return
+
+    canonical_url_unique_match = re.search(
+        r"ALTER TABLE\s+`?events`?\s+ADD CONSTRAINT\s+`?uq_event_canonical_url`?\s+"
+        r"UNIQUE\s*\(\s*`?canonical_url`?\s*\)",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if canonical_url_unique_match is not None:
+        if await _index_exists(conn, "events", "uq_event_canonical_url"):
+            return
+        # utf8mb4 + long VARCHAR can exceed key-size limits for full-length UNIQUE indexes.
+        await conn.execute(
+            text("CREATE UNIQUE INDEX uq_event_canonical_url ON events (canonical_url(512))")
+        )
+        return
+
+    await conn.execute(text(statement))
+
+
+def _strip_if_not_exists(statement: str) -> str:
+    return re.sub(r"\s+IF\s+NOT\s+EXISTS", "", statement, count=1, flags=re.IGNORECASE)
+
+
+async def _column_exists(conn: AsyncConnection, table_name: str, column_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND column_name = :column_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "column_name": column_name},
+    )
+    return result.first() is not None
+
+
+async def _index_exists(conn: AsyncConnection, table_name: str, index_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND index_name = :index_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "index_name": index_name},
+    )
+    return result.first() is not None
+
+
+async def _constraint_exists(conn: AsyncConnection, table_name: str, constraint_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.table_constraints "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = :table_name "
+            "AND constraint_name = :constraint_name "
+            "LIMIT 1"
+        ),
+        {"table_name": table_name, "constraint_name": constraint_name},
+    )
+    return result.first() is not None
+
+
+async def _seed_default_sources(session: AsyncSession) -> None:
+    existing_rows = await session.execute(
+        text("SELECT name FROM sources WHERE region_id = :region_id"),
+        {"region_id": REGION_SAN_DIEGO_ID},
+    )
+    existing_names = {str(row[0]).strip().lower() for row in existing_rows.all() if row[0]}
+    for source in build_default_sources():
+        if source.name.strip().lower() in existing_names:
+            continue
+        session.add(
+            Source(
+                region_id=source.region_id,
+                name=source.name,
+                domain=source.domain,
+                base_url=source.base_url,
+                source_type=source.source_type,
+                category_hint=source.category_hint,
+                neighborhood=source.neighborhood,
+                is_active=source.is_active,
+                crawl_allowed=source.crawl_allowed,
+                crawl_delay_seconds=source.crawl_delay_seconds,
+                rate_limit_per_min=source.rate_limit_per_min,
+                attribution_text=source.attribution_text,
+                robots_txt_url=source.robots_txt_url,
+                terms_url=source.terms_url,
+                parse_strategy=source.parse_strategy,
+            )
+        )

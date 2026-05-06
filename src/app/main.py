@@ -1,24 +1,50 @@
 """City Pulse FastAPI application."""
 
+import asyncio
 import logging
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.routes import api_router
 from app.config import settings
-from app.database import init_db
+from app.database import async_session_maker, init_db
+from app.ingestion.service import run_ingestion
 
 logger = logging.getLogger("app.request")
+MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media"
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+async def _ingestion_scheduler_loop() -> None:
+    interval_seconds = max(settings.ingest_scheduler_interval_minutes, 5) * 60
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            async with async_session_maker() as db:
+                await run_ingestion(db, trigger_type="scheduler")
+                await db.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("Scheduled ingestion run failed")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    if not settings.skip_db_init:
+        await init_db()
+    scheduler_task: asyncio.Task | None = None
+    if settings.ingest_scheduler_enabled:
+        scheduler_task = asyncio.create_task(_ingestion_scheduler_loop())
     yield
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler_task
 
 
 app = FastAPI(
@@ -37,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 
 
 @app.middleware("http")
@@ -78,7 +105,11 @@ async def root():
             "/api/users",
             "/api/regions",
             "/api/events",
+            "/api/health",
             "/api/trends",
             "/api/interactions",
+            "/api/sources",
+            "/api/ingest",
+            "/api/partner-submissions",
         ],
     }

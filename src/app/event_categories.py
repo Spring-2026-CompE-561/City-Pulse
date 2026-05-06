@@ -9,6 +9,9 @@ ALLOWED_EVENT_CATEGORIES: tuple[str, ...] = (
     "Food & Drink",
     "Health & Wellness",
     "Music",
+    "Nightlife",
+    "Charity & Causes",
+    "Community",
 )
 
 ALL_CATEGORIES_OPTION = "All Categories"

@@ -7,14 +7,14 @@ from fastapi import APIRouter, Depends, Path
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import verify_password
+from app.auth import get_current_user_required, verify_password
 from app.database import get_db
-from app.exceptions import bad_request, conflict, not_found, unauthorized
+from app.exceptions import bad_request, conflict, forbidden, not_found, unauthorized
 from app.models import User
 from app.region_map import region_id_to_city_location
-from app.repositories.region_repository import resolve_region_id_for_city_location
-from app.repositories.user_repository import get_user_by_id
-from app.repositories.user_repository import (
+from app.repository.region import resolve_region_id_for_city_location
+from app.repository.user import get_user_by_id
+from app.repository.user import (
     list_users as list_user_rows,
 )
 from app.schemas import SuccessResponse, UserListResponse, UserRead, UserUpdate
@@ -60,12 +60,15 @@ async def get_user(
 async def update_user(
     id: int = Path(..., description="User ID (the 'id' field from the user list)"),
     payload: UserUpdate = ...,
+    current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
     """Update user name/email/city_location. Requires current_password. city_location only 'san diego'."""
     user = await get_user_by_id(db, id)
     if user is None:
         raise not_found("User not found")
+    if current_user.id != id:
+        raise forbidden("Cannot modify another user")
     if not verify_password(payload.current_password, user.password_hash):
         raise unauthorized("Incorrect password")
     try:
