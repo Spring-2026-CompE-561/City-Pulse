@@ -83,7 +83,6 @@ class Event(SQLModel, table=True):
     __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
         UniqueConstraint("source_id", "external_id", name="uq_event_source_external"),
-        UniqueConstraint("canonical_url", name="uq_event_canonical_url"),
     )
 
     # Primary key.
