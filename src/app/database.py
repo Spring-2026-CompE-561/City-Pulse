@@ -114,6 +114,16 @@ async def init_db() -> None:
                     "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Technology'"
                 )
             )
+        event_image_column = await conn.execute(
+            text("SHOW COLUMNS FROM events LIKE 'event_image_url'")
+        )
+        if event_image_column.first() is None:
+            await conn.execute(
+                text(
+                    "ALTER TABLE events "
+                    "ADD COLUMN event_image_url VARCHAR(2048) NULL"
+                )
+            )
         # Ensure San Diego exists. Prefer id=0 for consistency, but don't create
         # duplicates if older DBs already stored it under a different id.
         existing = await conn.execute(
@@ -277,13 +287,14 @@ async def _constraint_exists(conn: AsyncConnection, table_name: str, constraint_
 
 
 async def _seed_default_sources(session: AsyncSession) -> None:
-    existing_count = await session.execute(
-        text("SELECT COUNT(*) FROM sources WHERE region_id = :region_id"),
+    existing_rows = await session.execute(
+        text("SELECT name FROM sources WHERE region_id = :region_id"),
         {"region_id": REGION_SAN_DIEGO_ID},
     )
-    if int(existing_count.scalar() or 0) > 0:
-        return
+    existing_names = {str(row[0]).strip().lower() for row in existing_rows.all() if row[0]}
     for source in build_default_sources():
+        if source.name.strip().lower() in existing_names:
+            continue
         session.add(
             Source(
                 region_id=source.region_id,

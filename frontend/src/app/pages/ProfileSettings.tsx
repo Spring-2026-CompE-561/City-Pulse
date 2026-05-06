@@ -185,16 +185,6 @@ export function ProfileSettings() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="profile-picture-url" className="text-sm font-medium">Profile Picture URL</label>
-              <Input
-                id="profile-picture-url"
-                value={profilePicture}
-                onChange={(e) => setProfilePicture(e.target.value)}
-                placeholder="https://example.com/profile.jpg"
-              />
-            </div>
-
-            <div className="space-y-2">
               <label htmlFor="profile-picture-upload" className="text-sm font-medium">Upload Profile Picture</label>
               <Input
                 id="profile-picture-upload"

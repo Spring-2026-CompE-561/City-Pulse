@@ -3,11 +3,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion.adapters import fetch_source_events
+from app.ingestion.dedupe import build_content_signature
 from app.ingestion.upsert_service import upsert_normalized_event
 from app.models import Source
 from app.region_map import REGION_SAN_DIEGO_ID
 from app.repository.ingest import complete_ingest_run, create_ingest_run
-from app.repository.event import delete_bad_calendar_events
+from app.repository.event import delete_bad_calendar_events, remove_duplicate_source_events
 from app.repository.source import get_source_by_id, list_active_sources
 from app.repository.trend import (
     clear_region_trends,
@@ -96,6 +97,23 @@ def _join_errors_for_db(messages: list[str], *, max_chars: int = 200) -> str | N
     return joined[: max_chars - 3].rstrip() + "..."
 
 
+def _item_signature(
+    *,
+    title: str,
+    content: str | None,
+    venue_name: str | None,
+    neighborhood: str | None,
+    event_start_at: datetime | None,
+) -> str:
+    return build_content_signature(
+        title=title,
+        content=content,
+        venue_name=venue_name,
+        neighborhood=neighborhood,
+        event_start_iso=event_start_at.isoformat() if event_start_at else None,
+    )
+
+
 async def run_ingestion(
     db: AsyncSession,
     *,
@@ -117,6 +135,8 @@ async def run_ingestion(
     error_count = 0
     error_messages: list[str] = []
     skipped_count += await delete_bad_calendar_events(db, region_id=region_id)
+    skipped_count += await remove_duplicate_source_events(db, region_id=region_id)
+    run_seen_signatures: set[str] = set()
 
     sources = await _sources_for_run(db, region_id=region_id, source_id=source_id, area=area)
     for source in sources:
@@ -145,6 +165,17 @@ async def run_ingestion(
             ):
                 skipped_count += 1
                 continue
+            signature = _item_signature(
+                title=item.title,
+                content=item.content,
+                venue_name=item.venue_name,
+                neighborhood=item.neighborhood,
+                event_start_at=item.event_start_at,
+            )
+            if signature in run_seen_signatures:
+                skipped_count += 1
+                continue
+            run_seen_signatures.add(signature)
             try:
                 async with db.begin_nested():
                     outcome = await upsert_normalized_event(

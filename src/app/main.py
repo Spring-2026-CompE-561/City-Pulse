@@ -1,13 +1,15 @@
 """City Pulse FastAPI application."""
 
+import asyncio
 import logging
 import time
-import asyncio
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.routes import api_router
 from app.config import settings
@@ -15,6 +17,8 @@ from app.database import async_session_maker, init_db
 from app.ingestion.service import run_ingestion
 
 logger = logging.getLogger("app.request")
+MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media"
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 async def _ingestion_scheduler_loop() -> None:
@@ -59,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 
 
 @app.middleware("http")

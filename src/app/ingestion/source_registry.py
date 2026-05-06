@@ -79,10 +79,89 @@ DEFAULT_MUSIC_SOURCES: tuple[dict[str, str | bool | int | None], ...] = (
     },
 )
 
+DEFAULT_COMMUNITY_SOURCES: tuple[dict[str, str | bool | int | None], ...] = (
+    {
+        "name": "Eventbrite San Diego Events",
+        "domain": "eventbrite.com",
+        "base_url": "https://www.eventbrite.com/d/ca--san-diego/events/",
+        "source_type": "html",
+        "category_hint": "Community",
+        "neighborhood": None,
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 15,
+        "rate_limit_per_min": 4,
+        "parse_strategy": "generic_html",
+    },
+    {
+        "name": "City of San Diego Calendar",
+        "domain": "sandiego.gov",
+        "base_url": "https://www.sandiego.gov/events/calendar",
+        "source_type": "html",
+        "category_hint": "Community",
+        "neighborhood": None,
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 15,
+        "rate_limit_per_min": 4,
+        "parse_strategy": "generic_html",
+    },
+    {
+        "name": "San Diego Tourism Festivals",
+        "domain": "sandiego.org",
+        "base_url": "https://www.sandiego.org/events-festivals",
+        "source_type": "html",
+        "category_hint": "Arts & Culture",
+        "neighborhood": None,
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 15,
+        "rate_limit_per_min": 4,
+        "parse_strategy": "generic_html",
+    },
+    {
+        "name": "Mission Beach Boardwalk Events",
+        "domain": "mbhsd.com",
+        "base_url": "https://www.mbhsd.com/events",
+        "source_type": "html",
+        "category_hint": "Community",
+        "neighborhood": "Mission Beach",
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 15,
+        "rate_limit_per_min": 4,
+        "parse_strategy": "generic_html",
+    },
+    {
+        "name": "Whistle Stop Events",
+        "domain": "whistlestopbar.com",
+        "base_url": "https://whistlestopbar.com/",
+        "source_type": "html",
+        "category_hint": "Music",
+        "neighborhood": "South Park",
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 12,
+        "rate_limit_per_min": 5,
+        "parse_strategy": "generic_html",
+    },
+    {
+        "name": "San Diego Magazine Community Events",
+        "domain": "sandiegomagazine.com",
+        "base_url": "https://sandiegomagazine.com/community-events/",
+        "source_type": "html",
+        "category_hint": "Community",
+        "neighborhood": None,
+        "crawl_allowed": True,
+        "crawl_delay_seconds": 15,
+        "rate_limit_per_min": 4,
+        "parse_strategy": "generic_html",
+    },
+)
+
 
 def build_default_sources() -> list[Source]:
     records: list[Source] = []
-    for payload in (*DEFAULT_NIGHTLIFE_SOURCES, *DEFAULT_MUSIC_SOURCES):
+    for payload in (
+        *DEFAULT_NIGHTLIFE_SOURCES,
+        *DEFAULT_MUSIC_SOURCES,
+        *DEFAULT_COMMUNITY_SOURCES,
+    ):
         records.append(
             Source(
                 region_id=REGION_SAN_DIEGO_ID,

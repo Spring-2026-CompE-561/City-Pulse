@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
+import { build_media_url } from '../lib/api';
 import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
-import { Calendar, ExternalLink, MapPin, TrendingUp, Users } from 'lucide-react';
+import { Calendar, ExternalLink, FileText, MapPin, TrendingUp, Users } from 'lucide-react';
 
 interface EventCardProps {
   event: FeedEvent;
@@ -11,19 +12,30 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const eventDate = new Date(event.event_start_at ?? event.created_at);
-  const eventImage = CATEGORY_IMAGES[event.category] || DEFAULT_CATEGORY_IMAGE;
+  const uploadedImage = event.event_image_url ? build_media_url(event.event_image_url) : null;
+  const isPdfMedia = uploadedImage?.toLowerCase().endsWith('.pdf') ?? false;
+  const eventImage = !isPdfMedia
+    ? (uploadedImage ?? CATEGORY_IMAGES[event.category] ?? DEFAULT_CATEGORY_IMAGE)
+    : null;
 
-  const sourceLabel = event.source_name
-    ? `Imported from ${event.source_name}`
-    : event.origin_type === 'user'
-      ? `Posted by ${event.user_name ?? `user #${event.user_id ?? 'unknown'}`}`
-      : 'Imported listing';
+  const organizerLabel = event.origin_type === 'user'
+    ? (event.user_name ?? `user #${event.user_id ?? 'unknown'}`)
+    : (event.organizer_name ?? event.venue_name ?? event.user_name ?? 'Event Organizer');
 
   return (
     <Link href={`/event/${event.id}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
          <div className="relative h-32 overflow-hidden">
-           <img src={eventImage} alt={event.title} className="w-full h-full object-cover" />
+           {eventImage ? (
+             <img src={eventImage} alt={event.title} className="w-full h-full object-cover" />
+           ) : (
+             <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-700">
+               <div className="flex items-center gap-2 text-sm font-medium">
+                 <FileText className="w-4 h-4" />
+                 PDF Flyer
+               </div>
+             </div>
+           )}
            {event.trending && (
              <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
                <TrendingUp className="w-3 h-3 mr-1" />
@@ -76,7 +88,7 @@ export function EventCard({ event }: EventCardProps) {
 
         <CardFooter className="border-t pt-4">
           <div className="text-sm text-muted-foreground">
-            {sourceLabel}
+            Organizer: {organizerLabel}
           </div>
         </CardFooter>
       </Card>

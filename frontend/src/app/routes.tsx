@@ -5,7 +5,6 @@ import { EventDetail } from './pages/EventDetail';
 import { Profile } from './pages/Profile';
 import { ProfileSettings } from './pages/ProfileSettings';
 import { CreateEvent } from './pages/CreateEvent';
-import { PartnerSubmission } from './pages/PartnerSubmission';
 import { NotFound } from './pages/NotFound';
 
 export const router = createBrowserRouter([
@@ -32,10 +31,6 @@ export const router = createBrowserRouter([
   {
     path: '/create',
     Component: CreateEvent,
-  },
-  {
-    path: '/submit-partner-event',
-    Component: PartnerSubmission,
   },
   {
     path: '*',

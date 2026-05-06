@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_required
 from app.database import get_db
+from app.event_metadata import clean_event_description, extract_organizer_name
 from app.exceptions import forbidden
 from app.models import User
 from app.region_map import parse_region_param
@@ -117,6 +118,18 @@ async def list_events_with_interactions(
         if ev.source_id is not None:
             source = await get_source_by_id(db, ev.source_id)
             source_name = source.name if source is not None else None
+        organizer_name = (
+            ev.user.name
+            if ev.user is not None
+            else extract_organizer_name(ev.tags_json)
+            or ev.venue_name
+            or source_name
+        )
+        content = clean_event_description(
+            ev.content,
+            title=ev.title,
+            venue_name=ev.venue_name,
+        )
         try:
             out.append(
                 EventWithInteractionsRead(
@@ -126,12 +139,14 @@ async def list_events_with_interactions(
                     user_name=ev.user.name if ev.user else None,
                     title=ev.title or "Untitled event",
                     category=ev.category or "Community",
-                    content=ev.content,
+                    content=content,
                     source_id=ev.source_id,
                     source_name=source_name,
+                    organizer_name=organizer_name,
                     origin_type=ev.origin_type or "user",
                     external_url=ev.external_url,
                     canonical_url=ev.canonical_url,
+                    event_image_url=ev.event_image_url,
                     event_start_at=ev.event_start_at,
                     event_end_at=ev.event_end_at,
                     timezone=ev.timezone or "America/Los_Angeles",

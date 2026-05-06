@@ -1,12 +1,15 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
 from datetime import datetime
+from pathlib import Path as FilePath
+from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends, Path, Query
+from fastapi import APIRouter, Body, Depends, File, Path, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_required
 from app.database import get_db
+from app.event_metadata import clean_event_description, extract_organizer_name
 from app.event_categories import (
     ALL_CATEGORIES_OPTION,
     ALLOWED_EVENT_CATEGORIES,
@@ -30,14 +33,23 @@ from app.repository.event import (
 from app.schemas import (
     EventCategoryOptionsResponse,
     EventCreate,
+    EventImageUploadResponse,
     EventRead,
     EventUpdate,
     SuccessResponse,
 )
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
+EVENT_MEDIA_DIR = FilePath(__file__).resolve().parents[2] / "media" / "events"
+ALLOWED_EVENT_MEDIA_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "application/pdf": ".pdf",
+}
+MAX_EVENT_MEDIA_BYTES = 10 * 1024 * 1024
 
 
+@router.get("", response_model=list[EventRead], include_in_schema=False)
 @router.get("/", response_model=list[EventRead])
 async def list_events(
     region: str | int = Query("san diego", description="Region: 'san diego' or 0 (optional)"),
@@ -76,6 +88,30 @@ async def list_categories():
     return EventCategoryOptionsResponse(options=[ALL_CATEGORIES_OPTION, *ALLOWED_EVENT_CATEGORIES])
 
 
+@router.post("/upload-image", response_model=EventImageUploadResponse)
+async def upload_event_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user_required),
+):
+    """Upload an event media file (JPEG/PNG/PDF) and return a public media URL."""
+    if current_user.id is None:
+        raise RuntimeError("User id missing from database record")
+    if file.content_type not in ALLOWED_EVENT_MEDIA_TYPES:
+        raise bad_request("Only JPEG, PNG, and PDF files are allowed")
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise bad_request("Uploaded file is empty")
+    if len(file_bytes) > MAX_EVENT_MEDIA_BYTES:
+        raise bad_request("File too large (max 10 MB)")
+
+    EVENT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    extension = ALLOWED_EVENT_MEDIA_TYPES[file.content_type]
+    generated_name = f"{uuid4().hex}{extension}"
+    target_path = EVENT_MEDIA_DIR / generated_name
+    target_path.write_bytes(file_bytes)
+    return EventImageUploadResponse(url=f"/media/events/{generated_name}")
+
+
 @router.get("/{id}", response_model=EventRead)
 async def get_event(
     id: int = Path(..., description="Event ID (the 'id' field from the event list)"),
@@ -85,6 +121,18 @@ async def get_event(
     event = await get_event_by_id(db, id)
     if not event:
         raise not_found("Event not found")
+    organizer_name = (
+        event.user.name
+        if event.user is not None
+        else extract_organizer_name(event.tags_json)
+        or event.venue_name
+        or (event.source.name if event.source else None)
+    )
+    content = clean_event_description(
+        event.content,
+        title=event.title,
+        venue_name=event.venue_name,
+    )
     return EventRead(
         id=event.id,
         region_id=event.region_id,
@@ -92,13 +140,15 @@ async def get_event(
         user_name=event.user.name if event.user else None,
         title=event.title,
         category=event.category,
-        content=event.content,
+        content=content,
         source_id=event.source_id,
         source_name=event.source.name if event.source else None,
+        organizer_name=organizer_name,
         origin_type=event.origin_type,
         external_id=event.external_id,
         external_url=event.external_url,
         canonical_url=event.canonical_url,
+        event_image_url=event.event_image_url,
         event_start_at=event.event_start_at,
         event_end_at=event.event_end_at,
         timezone=event.timezone,
@@ -115,6 +165,7 @@ async def get_event(
     )
 
 
+@router.post("", response_model=EventRead, status_code=201, include_in_schema=False)
 @router.post("/", response_model=EventRead, status_code=201)
 async def create_event(
     payload: EventCreate,
@@ -143,6 +194,7 @@ async def create_event(
         title=payload.title,
         category=validate_event_category(payload.category),
         content=payload.content,
+        event_image_url=payload.event_image_url,
         event_start_at=payload.event_start_at,
         event_end_at=payload.event_end_at,
         timezone=payload.timezone,
@@ -179,6 +231,7 @@ async def update_event(
         title=payload.title,
         category=normalized_category,
         content=payload.content,
+        event_image_url=payload.event_image_url,
         event_start_at=payload.event_start_at,
         event_end_at=payload.event_end_at,
         timezone=payload.timezone,
