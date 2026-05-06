@@ -130,8 +130,10 @@ MYSQL_ROOT_PASSWORD=replace-root-password
 MYSQL_DATABASE=city_pulse
 MYSQL_USER=city_pulse
 MYSQL_PASSWORD=replace-app-password
+MYSQL_HOST_PORT=3307
 JWT_SECRET_KEY=replace-with-32-byte-secret
 INGEST_API_KEY=replace-with-ingest-key
+NEXT_PUBLIC_API_BASE_URL=/api
 DEBUG=false
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=7
@@ -146,16 +148,23 @@ INGEST_SCHEDULER_INTERVAL_MINUTES=60
 If your local DB already has the state you want teammates to use:
 
 ```bash
-mysqldump -h 127.0.0.1 -P 3306 -u city_pulse -p --databases city_pulse > docker/mysql/init/01-city-pulse-seed.sql
+mysqldump --no-tablespaces -h 127.0.0.1 -P 3306 -u city_pulse -p --databases city_pulse --result-file=docker/mysql/init/01-city-pulse-seed.sql
 ```
 
 Notes:
 
+- Use `--result-file` (instead of PowerShell `>` redirection). PowerShell redirection can produce UTF-16 output that MySQL init cannot parse.
 - Seed scripts run only when the `mysql_data` volume is empty.
 - To re-seed from scratch later:
 
 ```bash
 docker compose --env-file .env.docker down -v
+```
+
+Optional quick verification before reseed:
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -u city_pulse -p -D city_pulse -e "SELECT COUNT(*) AS users_count FROM users; SELECT COUNT(*) AS events_count FROM events;"
 ```
 
 ### 3) Start the stack
@@ -164,10 +173,19 @@ docker compose --env-file .env.docker down -v
 docker compose --env-file .env.docker up --build -d
 ```
 
+Optional verification after startup:
+
+```bash
+docker compose --env-file .env.docker exec -T db mysql -u city_pulse -p<password> -D city_pulse -e "SELECT COUNT(*) AS users_count FROM users; SELECT COUNT(*) AS events_count FROM events;"
+```
+
 Endpoints:
 
 - Frontend: `http://localhost:3000`
 - Backend docs: `http://localhost:8000/docs`
+- MySQL host access (optional): `localhost:${MYSQL_HOST_PORT}` (default `3307`)
+
+For Docker, keep `NEXT_PUBLIC_API_BASE_URL=/api` so the browser always calls the frontend origin and Next.js rewrites proxy to backend internally.
 
 ### 4) Let teammates access simultaneously
 

@@ -50,6 +50,7 @@ router = APIRouter(prefix="/api/interactions", tags=["Interactions"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("", response_model=list[EventWithInteractionsRead], include_in_schema=False)
 @router.get("/", response_model=list[EventWithInteractionsRead])
 async def list_events_with_interactions(
     region: str | int = Query("san diego", description="Region: 'san diego' or 0"),

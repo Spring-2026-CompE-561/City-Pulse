@@ -20,6 +20,7 @@ __pycache__/
 *.sqlite
 *.sqlite3
 *.sql
+!docker/mysql/init/01-city-pulse-seed.sql
 *.dump
 *.dmp
 *.bak

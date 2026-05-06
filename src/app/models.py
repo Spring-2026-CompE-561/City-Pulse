@@ -16,7 +16,7 @@ Called by / import relationships
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, UniqueConstraint, func
+from sqlalchemy import Column, DateTime, Index, UniqueConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -83,7 +83,7 @@ class Event(SQLModel, table=True):
     __tablename__ = "events"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
         UniqueConstraint("source_id", "external_id", name="uq_event_source_external"),
-        UniqueConstraint("canonical_url", name="uq_event_canonical_url"),
+        Index("uq_event_canonical_url", "canonical_url", unique=True, mysql_length=512),
     )
 
     # Primary key.
