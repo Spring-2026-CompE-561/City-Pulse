@@ -96,6 +96,7 @@ export function Profile() {
   const attendingEvents = events.filter((event) => attendingEventIds.includes(event.id));
   const organizedEvents = events.filter((event) => event.user_id === user.id);
   const commentsCount = events.reduce((acc, event) => acc + event.comments_count, 0);
+  const likesCount = organizedEvents.reduce((acc, event) => acc + (event.likes_count ?? 0), 0);
   const formatEventDate = (value: string): string => {
     const parsed = parse_api_datetime(value);
     if (!parsed) {
@@ -141,7 +142,7 @@ export function Profile() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t">
+            <div className="grid grid-cols-4 gap-4 mt-8 pt-8 border-t">
               <div className="text-center">
                 <div className="text-2xl font-bold" style={{ color: '#FF6B35' }}>{attendingEvents.length}</div>
                 <div className="text-sm text-muted-foreground">Attending</div>
@@ -153,6 +154,10 @@ export function Profile() {
               <div className="text-center">
                 <div className="text-2xl font-bold" style={{ color: '#E63946' }}>{commentsCount}</div>
                 <div className="text-sm text-muted-foreground">Comments</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold" style={{ color: '#E63946' }}>{likesCount}</div>
+                <div className="text-sm text-muted-foreground">Likes</div>
               </div>
             </div>
           </CardContent>
