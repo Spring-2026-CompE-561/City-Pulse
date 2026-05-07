@@ -1,17 +1,12 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { Separator } from '../components/ui/separator';
@@ -26,21 +21,29 @@ import {
   listCategories,
   listEventsWithInteractions,
   listTrends,
+  removeComment as removeCommentRequest,
   removeAttending,
   updateEvent as updateEventRequest,
 } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
 import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
-import { clearSession, getCurrentUser, isAttending, rememberAttending } from '../lib/storage';
-import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2, Pencil, Save, X } from 'lucide-react';
+import { parse_api_datetime } from '../lib/datetime';
+import { clearSession, getCurrentUser, getProfileOverride, isAttending, rememberAttending } from '../lib/storage';
+import { validate_post_quality } from '../lib/validation';
+import logoImage from '../../imports/CityPulse_Logo.png';
+import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2, Pencil, Save, X, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+
+function is_comment_by_current_user(comment: { user_id: number }, sessionUserId: number): boolean {
+  return Number(comment.user_id) === Number(sessionUserId);
+}
 
 function datetime_to_input_value(value: string | null): string {
   if (!value) {
     return '';
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const date = parse_api_datetime(value);
+  if (!date || Number.isNaN(date.getTime())) {
     return '';
   }
   const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
@@ -58,6 +61,7 @@ export function EventDetail() {
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deletingCommentIds, setDeletingCommentIds] = useState<number[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
@@ -119,15 +123,19 @@ export function EventDetail() {
           return;
         }
         const interactionEvent = interactionRows.find((row) => row.id === eventId);
-        setEventData(
-          interactionEvent ?? {
-            ...event,
-            likes_count: 0,
-            comments_count: 0,
-            attendance_count: 0,
-            comments: [],
-          }
-        );
+        const scopedComments = (interactionEvent?.comments ?? []).filter((comment) => comment.event_id === eventId);
+        const baseEvent = interactionEvent ?? {
+          ...event,
+          likes_count: 0,
+          comments_count: 0,
+          attendance_count: 0,
+          comments: [],
+        };
+        setEventData({
+          ...baseEvent,
+          comments: scopedComments,
+          comments_count: scopedComments.length,
+        });
         setTrending(trendRows.some((entry) => entry.event_id === eventId));
         setAttending(isAttending(eventId));
       } catch (error) {
@@ -201,15 +209,25 @@ export function EventDetail() {
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) {
+    const nextCommentText = newComment.trim();
+    if (!nextCommentText) {
+      return;
+    }
+    const qualityError = validate_post_quality(nextCommentText, { minLength: 8, minWords: 2 });
+    if (qualityError) {
+      toast.error(qualityError);
       return;
     }
     try {
-      const comment = await addCommentRequest(eventId, newComment.trim());
+      const comment = await addCommentRequest(eventId, nextCommentText);
+      if (comment.event_id !== eventId) {
+        toast.error('Comment was saved to a different event. Please refresh and try again.');
+        return;
+      }
       setEventData({
         ...eventData,
-        comments: [...eventData.comments, comment],
-        comments_count: eventData.comments_count + 1,
+        comments: [...eventData.comments.filter((item) => item.event_id === eventId), comment],
+        comments_count: eventData.comments.filter((item) => item.event_id === eventId).length + 1,
       });
       setNewComment('');
       toast.success('Comment posted!');
@@ -228,6 +246,33 @@ export function EventDetail() {
       router.push('/feed');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete event');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    const targetComment = eventData.comments.find((c) => c.id === commentId);
+    if (!targetComment || !is_comment_by_current_user(targetComment, user.id)) {
+      toast.error('You can only delete your own comments');
+      return;
+    }
+    if (!window.confirm('Delete this comment?')) {
+      return;
+    }
+    setDeletingCommentIds((prev) => [...prev, commentId]);
+    try {
+      await removeCommentRequest(eventId, commentId);
+      const remainingComments = eventData.comments.filter((comment) => comment.id !== commentId);
+      const scopedRemaining = remainingComments.filter((comment) => comment.event_id === eventId);
+      setEventData({
+        ...eventData,
+        comments: remainingComments,
+        comments_count: scopedRemaining.length,
+      });
+      toast.success('Comment deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete comment');
+    } finally {
+      setDeletingCommentIds((prev) => prev.filter((idValue) => idValue !== commentId));
     }
   };
 
@@ -261,6 +306,18 @@ export function EventDetail() {
     if (!editForm.title.trim() || !editForm.category.trim()) {
       toast.error('Please provide at least a title and category');
       return;
+    }
+    const titleQualityError = validate_post_quality(editForm.title.trim(), { minLength: 6, minWords: 2 });
+    if (titleQualityError) {
+      toast.error(`Title issue: ${titleQualityError}`);
+      return;
+    }
+    if (editForm.content.trim()) {
+      const descriptionQualityError = validate_post_quality(editForm.content.trim(), { minLength: 20, minWords: 4 });
+      if (descriptionQualityError) {
+        toast.error(`Description issue: ${descriptionQualityError}`);
+        return;
+      }
     }
     setIsSaving(true);
     try {
@@ -297,23 +354,79 @@ export function EventDetail() {
     }
   };
 
-  const isUserEvent = eventData.user_id === user.id;
-  const createdDate = new Date(eventData.created_at);
-  const startDate = eventData.event_start_at ? new Date(eventData.event_start_at) : null;
+  const isUserEvent = Number(eventData.user_id) === Number(user.id);
+  const createdDate = parse_api_datetime(eventData.created_at) ?? new Date();
+  const startDate = parse_api_datetime(eventData.event_start_at);
   const uploadedImage = eventData.event_image_url ? build_media_url(eventData.event_image_url) : null;
   const isPdfMedia = uploadedImage?.toLowerCase().endsWith('.pdf') ?? false;
   const eventImage = !isPdfMedia
     ? (uploadedImage ?? CATEGORY_IMAGES[eventData.category] ?? DEFAULT_CATEGORY_IMAGE)
     : null;
+  const currentUserOverride = getProfileOverride(user.id);
+  const navbarDisplayName = currentUserOverride?.displayName || user.name;
+  const navbarProfileImage = currentUserOverride?.avatarUrl || '';
+  const organizerLabel = eventData.organizer_name ?? eventData.venue_name ?? eventData.user_name ?? 'Event Organizer';
+  const organizerAvatarUrl = Number(eventData.user_id) === Number(user.id) ? (currentUserOverride?.avatarUrl || '') : '';
+  const scopedComments = eventData.comments.filter((comment) => comment.event_id === eventId);
+  const mapQueryParts = [
+    eventData.venue_name?.trim(),
+    eventData.venue_address?.trim(),
+    eventData.neighborhood?.trim(),
+  ].filter((part): part is string => Boolean(part));
+  const mapQuery = mapQueryParts.join(', ');
+  const mapEmbedUrl = mapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
+    : null;
+  const mapSearchUrl = mapQuery
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
+    : 'https://www.google.com/maps';
+
+  const handleLogout = () => {
+    clearSession();
+    toast.success('Logged out successfully');
+    router.push('/');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Events
-          </Button>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => router.push('/feed')}>
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <Link href="/feed" className="hidden sm:flex items-center gap-2 min-w-0">
+                <img src={logoImage.src} alt="CityPulse Logo" className="w-8 h-8 shrink-0" />
+                <span
+                  className="text-xl font-bold truncate"
+                  style={{
+                    background: 'linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  CityPulse
+                </span>
+              </Link>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              <Link href="/profile">
+                <Button variant="ghost" size="sm" className="gap-2 max-w-[12rem] sm:max-w-none">
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarImage src={navbarProfileImage} alt={navbarDisplayName} />
+                    <AvatarFallback>{navbarDisplayName[0] ?? 'U'}</AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:inline truncate">{navbarDisplayName}</span>
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={handleLogout} aria-label="Log out">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -345,9 +458,15 @@ export function EventDetail() {
                 {eventData.category}
               </Badge>
               <h1 className="text-4xl font-bold mb-4">{eventData.title}</h1>
-              <p className="text-sm text-muted-foreground mb-2">
-                Organizer: {eventData.organizer_name ?? eventData.venue_name ?? eventData.user_name ?? 'Event Organizer'}
-              </p>
+              <div className="mb-2 flex items-center gap-2">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={organizerAvatarUrl} alt={organizerLabel} />
+                  <AvatarFallback>{organizerLabel[0] ?? 'O'}</AvatarFallback>
+                </Avatar>
+                <p className="text-sm text-muted-foreground">
+                  Organizer: {organizerLabel}
+                </p>
+              </div>
               <p className="text-lg text-muted-foreground">
                 {eventData.content ?? 'No event description provided.'}
               </p>
@@ -367,36 +486,48 @@ export function EventDetail() {
                   </div>
                 </CardContent>
               </Card>
-               <Card>
-                 <CardContent className="p-4 flex items-center gap-3">
-                   <MapPin className="w-5 h-5 text-green-600" />
-                   <div>
-                     <div className="text-sm text-muted-foreground">Location</div>
-                     <div className="font-semibold">
-                       {eventData.venue_name ?? 'San Diego Venue'}
-                       {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
-                     </div>
-                   </div>
-                 </CardContent>
-               </Card>
-               <Card>
-                 <CardContent className="p-0 overflow-hidden h-64 bg-gray-200 flex items-center justify-center relative">
-                   <div className="text-center p-4">
-                     <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                     <p className="text-sm text-muted-foreground mb-4">Map view unavailable without API key</p>
-                     <Button 
-                       variant="outline" 
-                       size="sm" 
-                       onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                         (eventData.venue_name ?? 'San Diego') + (eventData.neighborhood ? `, ${eventData.neighborhood}` : '')
-                       )}`, '_blank')}
-                     >
-                       View on Google Maps
-                     </Button>
-                   </div>
-                 </CardContent>
-               </Card>
-
+              <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <MapPin className="w-5 h-5 text-green-600" />
+                  <div>
+                    <div className="text-sm text-muted-foreground">Location</div>
+                    <div className="font-semibold">
+                      {eventData.venue_name ?? 'San Diego Venue'}
+                      {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="sm:col-span-2">
+                <CardContent className="p-0 overflow-hidden h-72 bg-gray-200 relative">
+                  {mapEmbedUrl ? (
+                    <iframe
+                      title="Event location map"
+                      src={mapEmbedUrl}
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-center p-4">
+                      <div>
+                        <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">Add a venue address to preview the map</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute bottom-3 right-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white/95"
+                      onClick={() => window.open(mapSearchUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      View on Google Maps
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {eventData.external_url && (
@@ -409,61 +540,6 @@ export function EventDetail() {
                 View original source listing
               </a>
             )}
-
-            <Separator />
-
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <MessageCircle className="w-5 h-5" />
-                <h2 className="text-2xl font-bold">Discussion</h2>
-              </div>
-
-              <Card className="mb-4">
-                <CardContent className="p-4 space-y-2">
-                  <Textarea
-                    placeholder="Share your thoughts..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    rows={3}
-                  />
-                  <div className="flex justify-end">
-                    <Button onClick={handleAddComment} disabled={!newComment.trim()}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Post Comment
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-4">
-                {eventData.comments.length === 0 ? (
-                  <Card>
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      Be the first to comment and start a discussion!
-                    </CardContent>
-                  </Card>
-                ) : (
-                  eventData.comments.map((comment) => (
-                    <Card key={comment.id}>
-                      <CardContent className="p-4 flex gap-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarFallback>U{comment.user_id}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">{comment.user_name ?? `User #${comment.user_id}`}</span>
-                            <span className="text-sm text-muted-foreground">
-                               {new Date(comment.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground">{comment.text}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
           <div className="space-y-6">
@@ -503,6 +579,85 @@ export function EventDetail() {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="container mx-auto px-4 pb-10">
+        <div className="max-w-3xl mx-auto">
+          <Separator className="mb-6" />
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <MessageCircle className="w-5 h-5" />
+            <h2 className="text-2xl font-bold text-center">Discussion</h2>
+          </div>
+
+          <Card className="mb-4">
+            <CardContent className="p-4 space-y-2">
+              <Textarea
+                placeholder="Share your thoughts..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={3}
+              />
+              <div className="flex justify-end">
+                <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                  <Send className="w-4 h-4 mr-2" />
+                  Post Comment
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            {scopedComments.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  Be the first to comment and start a discussion!
+                </CardContent>
+              </Card>
+            ) : (
+              scopedComments.map((comment) => {
+                const isCurrentUserComment = is_comment_by_current_user(comment, user.id);
+                const commentDisplayName = isCurrentUserComment
+                  ? (currentUserOverride?.displayName || user.name)
+                  : (comment.user_name ?? `User #${comment.user_id}`);
+                const commentAvatarUrl = isCurrentUserComment ? (currentUserOverride?.avatarUrl || '') : '';
+                const isDeletingComment = deletingCommentIds.includes(comment.id);
+                return (
+                  <Card key={comment.id}>
+                    <CardContent className="flex gap-3 p-4">
+                      <Avatar className="h-10 w-10 shrink-0">
+                        <AvatarImage src={commentAvatarUrl} alt={commentDisplayName} />
+                        <AvatarFallback>{commentDisplayName[0] ?? 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="mb-2 flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+                          <span className="font-semibold truncate">{commentDisplayName}</span>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap shrink-0">
+                            {(parse_api_datetime(comment.created_at) ?? new Date(comment.created_at)).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground whitespace-pre-wrap break-words">{comment.text}</p>
+                        {isCurrentUserComment && (
+                          <div className="mt-3 flex justify-end border-t border-border/50 pt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 shrink-0 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={isDeletingComment}
+                              onClick={() => handleDeleteComment(comment.id)}
+                              aria-label={isDeletingComment ? 'Deleting comment' : 'Delete your comment'}
+                            >
+                              <Trash2 className="w-4 h-4 sm:mr-1.5" aria-hidden />
+                              <span className="hidden sm:inline">{isDeletingComment ? 'Deleting...' : 'Delete'}</span>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </div>

@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { getMe, isAuthError, listEventsWithInteractions } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
 import { CATEGORY_IMAGES } from '../lib/constants';
+import { parse_api_datetime } from '../lib/datetime';
 import { clearSession, getCurrentUser, getProfileOverride, getStorageData, setCurrentUser } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, TrendingUp, Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -95,6 +96,16 @@ export function Profile() {
   const attendingEvents = events.filter((event) => attendingEventIds.includes(event.id));
   const organizedEvents = events.filter((event) => event.user_id === user.id);
   const commentsCount = events.reduce((acc, event) => acc + event.comments_count, 0);
+  const formatEventDate = (value: string): string => {
+    const parsed = parse_api_datetime(value);
+    if (!parsed) {
+      return 'Date unavailable';
+    }
+    return parsed.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -180,10 +191,7 @@ export function Profile() {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                         <Calendar className="w-4 h-4" />
                         <span>
-                          {new Date(event.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {formatEventDate(event.created_at)}
                         </span>
                       </div>
                     </CardHeader>
@@ -219,10 +227,7 @@ export function Profile() {
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />
                             <span>
-                              {new Date(event.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}
+                              {formatEventDate(event.created_at)}
                             </span>
                           </div>
                           <Badge variant="secondary" className="text-xs">

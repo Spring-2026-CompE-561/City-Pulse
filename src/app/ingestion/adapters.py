@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 from html import unescape
 from urllib.parse import parse_qs, unquote, urljoin, urlparse
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -61,6 +62,12 @@ MONTH_NAME_PATTERN = re.compile(
     r")\s+\d{1,2}(?:,\s*\d{4})?",
     re.IGNORECASE,
 )
+TIME_WITH_AMPM_PATTERN = re.compile(
+    r"\b(?P<hour>1[0-2]|0?[1-9])(?::(?P<minute>[0-5]\d))?\s*(?P<period>a\.?m?\.?|p\.?m?\.?)\b",
+    re.IGNORECASE,
+)
+TIME_24H_PATTERN = re.compile(r"\b(?P<hour>[01]?\d|2[0-3]):(?P<minute>[0-5]\d)\b")
+DATE_ONLY_ISO_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 KNOWN_EVENT_HOST_TOKENS = (
     "eventbrite",
     "sandiegoreader",
@@ -85,6 +92,22 @@ EVENT_LINK_TOKENS = (
     "ticket",
 )
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+SOURCE_TIMEZONE = ZoneInfo("America/Los_Angeles")
+PM_CONTEXT_TOKENS = (
+    "night",
+    "evening",
+    "tonight",
+    "afterparty",
+    "party",
+    "dance",
+    "club",
+    "dj",
+    "show",
+    "concert",
+    "doors",
+    "happy hour",
+    "live music",
+)
 ORGANIZER_PATTERN = re.compile(
     r"(?:organizer|hosted by|presented by)\s*[:\-]\s*([a-z0-9&'.,()\- ]{2,120})",
     re.IGNORECASE,
@@ -389,12 +412,17 @@ def _normalize_iso_datetime(value: str) -> datetime | None:
         return None
     if raw.endswith("Z"):
         raw = raw[:-1] + "+00:00"
+    is_date_only = bool(DATE_ONLY_ISO_PATTERN.match(raw))
     try:
         parsed = datetime.fromisoformat(raw)
     except ValueError:
         return None
+    if is_date_only:
+        parsed = parsed.replace(tzinfo=SOURCE_TIMEZONE)
+        return parsed.astimezone(UTC)
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
+        # Source listings commonly emit naive local datetimes.
+        return parsed.replace(tzinfo=SOURCE_TIMEZONE).astimezone(UTC)
     return parsed.astimezone(UTC)
 
 
@@ -414,6 +442,62 @@ def _event_within_window(
     return start_date <= event_start <= end_date
 
 
+def _prefer_pm_for_context(*texts: str | None) -> bool:
+    blob = " ".join((text or "") for text in texts).lower()
+    return any(token in blob for token in PM_CONTEXT_TOKENS)
+
+
+def _extract_time_from_text(text: str | None, *, prefer_pm: bool = False) -> tuple[int, int] | None:
+    if not text:
+        return None
+    ampm_match = TIME_WITH_AMPM_PATTERN.search(text)
+    if ampm_match:
+        hour = int(ampm_match.group("hour"))
+        minute = int(ampm_match.group("minute") or 0)
+        period = ampm_match.group("period").lower().replace(".", "")
+        if period.startswith("p") and hour != 12:
+            hour += 12
+        if period.startswith("a") and hour == 12:
+            hour = 0
+        return hour, minute
+    twenty_four_match = TIME_24H_PATTERN.search(text)
+    if twenty_four_match:
+        hour = int(twenty_four_match.group("hour"))
+        minute = int(twenty_four_match.group("minute"))
+        if prefer_pm and 1 <= hour <= 11:
+            hour += 12
+        return hour, minute
+    return None
+
+
+def _apply_time_to_datetime(base: datetime, hour: int, minute: int) -> datetime:
+    if base.tzinfo is None:
+        local_value = base.replace(tzinfo=SOURCE_TIMEZONE)
+    else:
+        local_value = base.astimezone(SOURCE_TIMEZONE)
+    adjusted_local = local_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return adjusted_local.astimezone(UTC)
+
+
+def _is_midnight_utc(value: datetime | None) -> bool:
+    if value is None:
+        return False
+    if value.tzinfo is None:
+        local_value = value.replace(tzinfo=SOURCE_TIMEZONE)
+    else:
+        local_value = value.astimezone(SOURCE_TIMEZONE)
+    return local_value.hour == 0 and local_value.minute == 0
+
+
+def _extract_best_time_hint(*texts: str | None) -> tuple[int, int] | None:
+    prefer_pm = _prefer_pm_for_context(*texts)
+    for text in texts:
+        parsed = _extract_time_from_text(text, prefer_pm=prefer_pm)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _extract_event_datetime(
     html: str,
     *,
@@ -430,10 +514,27 @@ def _extract_event_datetime(
         with_year = date_text if "," in date_text else f"{date_text}, {start_date.year}"
         for fmt in ("%B %d, %Y", "%b %d, %Y"):
             try:
-                parsed = datetime.strptime(with_year, fmt).replace(tzinfo=UTC)
+                parsed = datetime.strptime(with_year, fmt).replace(tzinfo=SOURCE_TIMEZONE).astimezone(UTC)
             except ValueError:
                 continue
             if start_date <= parsed <= end_date:
+                context_start = max(0, hit.start() - 80)
+                context_end = min(len(body), hit.end() + 80)
+                contextual_time_hint = _extract_time_from_text(
+                    body[context_start:context_end],
+                    prefer_pm=_prefer_pm_for_context(body),
+                )
+                if contextual_time_hint is None:
+                    contextual_time_hint = _extract_time_from_text(
+                        body,
+                        prefer_pm=_prefer_pm_for_context(body),
+                    )
+                if contextual_time_hint is not None:
+                    parsed = _apply_time_to_datetime(
+                        parsed,
+                        contextual_time_hint[0],
+                        contextual_time_hint[1],
+                    )
                 return parsed
     return None
 
@@ -506,6 +607,8 @@ def _extract_json_ld_events(
             event_end = _normalize_iso_datetime(str(end_value)) if end_value else None
             description = node.get("description")
             content = str(description).strip()[:1024] if isinstance(description, str) else None
+            start_time_value = node.get("startTime")
+            door_time_value = node.get("doorTime")
             event_url = node.get("url")
             normalized_url = normalize_url(str(event_url)) if isinstance(event_url, str) else ""
             location = node.get("location")
@@ -544,6 +647,22 @@ def _extract_json_ld_events(
                 candidate_url = image_value.get("url")
                 if isinstance(candidate_url, str) and candidate_url.strip():
                     image_url = candidate_url
+            if _is_midnight_utc(event_start):
+                time_hint = _extract_best_time_hint(
+                    str(start_time_value) if start_time_value else None,
+                    str(door_time_value) if door_time_value else None,
+                    content,
+                    title,
+                )
+                if time_hint is not None:
+                    event_start = _apply_time_to_datetime(event_start, time_hint[0], time_hint[1])
+            if _is_midnight_utc(event_end):
+                end_time_hint = _extract_best_time_hint(
+                    str(node.get("endTime")) if node.get("endTime") else None,
+                    content,
+                )
+                if end_time_hint is not None and event_end is not None:
+                    event_end = _apply_time_to_datetime(event_end, end_time_hint[0], end_time_hint[1])
             extracted.append(
                 {
                     "title": title[:512],

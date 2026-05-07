@@ -324,3 +324,10 @@ export function addComment(eventId: number, text: string): Promise<CommentRead> 
   });
 }
 
+export function removeComment(eventId: number, commentId: number): Promise<SuccessResponse> {
+  return request<SuccessResponse>(`/api/interactions/events/${eventId}/comments/${commentId}`, {
+    method: 'DELETE',
+    auth: true,
+  });
+}
+

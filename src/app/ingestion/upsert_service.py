@@ -1,6 +1,7 @@
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ _MAX_PRICE_INFO_LEN = 255
 _MAX_IMAGE_URL_LEN = 2048
 _MAX_ORGANIZER_LEN = 255
 _REJECT_TITLE_TOKENS = ("calendar", "upcoming events", "all events")
+_SOURCE_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 
 def _clamp_str(value: str | None, max_len: int) -> str | None:
@@ -63,6 +65,26 @@ def _ensure_discrete_event_shape(normalized: NormalizedEvent) -> None:
         raise ValueError("ingestion rejected: calendar/listing page")
     if not (normalized.venue_name and normalized.venue_name.strip()):
         raise ValueError("ingestion rejected: missing venue")
+
+
+def _is_midnight_event_time(value: datetime | None) -> bool:
+    if value is None:
+        return False
+    if value.tzinfo is None:
+        local_value = value.replace(tzinfo=_SOURCE_TIMEZONE)
+    else:
+        local_value = value.astimezone(_SOURCE_TIMEZONE)
+    return local_value.hour == 0 and local_value.minute == 0
+
+
+def _choose_event_start(existing_value: datetime | None, incoming_value: datetime | None) -> datetime | None:
+    if incoming_value is None:
+        return existing_value
+    if existing_value is None:
+        return incoming_value
+    if _is_midnight_event_time(incoming_value) and not _is_midnight_event_time(existing_value):
+        return existing_value
+    return incoming_value
 
 
 async def _find_existing_event(db: AsyncSession, event: NormalizedEvent) -> Event | None:
@@ -147,6 +169,7 @@ async def upsert_normalized_event(
     }
     existing = await _find_existing_event(db, normalized)
     if existing:
+        chosen_start_at = _choose_event_start(existing.event_start_at, normalized.event_start_at)
         await update_event_fields(
             db,
             event=existing,
@@ -154,7 +177,7 @@ async def upsert_normalized_event(
             category=safe_category,
             content=normalized.content,
             event_image_url=normalized.event_image_url,
-            event_start_at=normalized.event_start_at,
+            event_start_at=chosen_start_at,
             event_end_at=normalized.event_end_at,
             timezone=normalized.timezone,
             venue_name=normalized.venue_name,

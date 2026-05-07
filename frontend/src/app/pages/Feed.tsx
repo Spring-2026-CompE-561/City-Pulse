@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { getMe, isAuthError, listCategories, listEventsWithInteractions, listTrends } from '../lib/api';
 import type { FeedEvent, UserRead } from '../lib/contracts';
-import { clearSession, getCurrentUser, setCurrentUser } from '../lib/storage';
+import { clearSession, getCurrentUser, getProfileOverride, setCurrentUser } from '../lib/storage';
 import { Search, TrendingUp, LogOut, Filter, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from '../../imports/CityPulse_Logo.png';
@@ -137,6 +137,9 @@ export function Feed() {
   }
 
   const trendingEvents = filteredEvents.filter((event) => event.trending);
+  const profileOverride = user ? getProfileOverride(user.id) : null;
+  const displayName = profileOverride?.displayName || user?.name || 'User';
+  const profileImage = profileOverride?.avatarUrl || '';
 
   useEffect(() => {
     setCurrentPage(1);
@@ -193,10 +196,10 @@ export function Feed() {
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src="" alt={user.name} />
-                    <AvatarFallback>{user.name[0]}</AvatarFallback>
+                    <AvatarImage src={profileImage} alt={displayName} />
+                    <AvatarFallback>{displayName[0]}</AvatarFallback>
                   </Avatar>
-                  <span className="hidden sm:inline">{user.name}</span>
+                  <span className="hidden sm:inline">{displayName}</span>
                 </Button>
               </Link>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -212,7 +215,7 @@ export function Feed() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              Welcome back, {user.name}!
+              Welcome back, {displayName}!
             </h1>
             <p className="text-muted-foreground">
               Discover events happening in {(user.city_location ?? 'San Diego').replace(/\b\w/g, l => l.toUpperCase())}

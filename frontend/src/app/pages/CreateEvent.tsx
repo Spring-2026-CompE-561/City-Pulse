@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { createEvent, isAuthError, listCategories, uploadEventImage } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
 import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
+import { validate_post_quality } from '../lib/validation';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,6 +67,16 @@ export function CreateEvent() {
     e.preventDefault();
     if (!formData.title || !formData.description || !formData.category) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    const titleQualityError = validate_post_quality(formData.title, { minLength: 6, minWords: 2 });
+    if (titleQualityError) {
+      toast.error(`Title issue: ${titleQualityError}`);
+      return;
+    }
+    const descriptionQualityError = validate_post_quality(formData.description, { minLength: 20, minWords: 4 });
+    if (descriptionQualityError) {
+      toast.error(`Description issue: ${descriptionQualityError}`);
       return;
     }
     if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
