@@ -17,6 +17,7 @@ const MAX_DESCRIPTION_LENGTH = 10000;
 
 export function CreateEvent() {
   const router = useRouter();
+  const nowMin = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
@@ -321,6 +322,7 @@ export function CreateEvent() {
                   <Input
                     id="eventStartDate"
                     type="datetime-local"
+                    min={nowMin}
                     value={formData.eventStartDate}
                     onChange={(e) => handleChange('eventStartDate', e.target.value)}
                   />
@@ -330,6 +332,7 @@ export function CreateEvent() {
                   <Input
                     id="eventEndDate"
                     type="datetime-local"
+                    min={formData.eventStartDate || nowMin}
                     value={formData.eventEndDate}
                     onChange={(e) => handleChange('eventEndDate', e.target.value)}
                   />
