@@ -17,7 +17,9 @@ const MAX_DESCRIPTION_LENGTH = 10000;
 
 export function CreateEvent() {
   const router = useRouter();
-  const nowMin = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const nowMin = new Date(todayMidnight.getTime() - todayMidnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
