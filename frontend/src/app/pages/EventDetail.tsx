@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import {
   addAttending,
   addComment as addCommentRequest,
+  addLike,
+  removeLike,
   build_media_url,
   deleteEvent,
   getEvent,
@@ -31,7 +33,7 @@ import { parse_api_datetime } from '../lib/datetime';
 import { clearSession, getCurrentUser, getProfileOverride, isAttending, rememberAttending } from '../lib/storage';
 import { validate_post_quality } from '../lib/validation';
 import logoImage from '../../imports/CityPulse_Logo.png';
-import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2, Pencil, Save, X, LogOut } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, TrendingUp, Check, MessageCircle, Send, Trash2, Pencil, Save, X, LogOut, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
 function is_comment_by_current_user(comment: { user_id: number }, sessionUserId: number): boolean {
@@ -56,6 +58,7 @@ export function EventDetail() {
   const eventId = Number(id);
   const [user, setUser] = useState<UserRead | null>(null);
   const [attending, setAttending] = useState(false);
+  const [liked, setLiked] = useState(false);
   const [eventData, setEventData] = useState<EventWithInteractionsRead | null>(null);
   const [trending, setTrending] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -205,6 +208,28 @@ export function EventDetail() {
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to update attendance');
+    }
+  };
+
+  const handleToggleLike = async () => {
+    try {
+      if (liked) {
+        await removeLike(eventId);
+        setLiked(false);
+        setEventData({
+          ...eventData,
+          likes_count: Math.max(0, (eventData.likes_count ?? 1) - 1),
+        });
+      } else {
+        await addLike(eventId);
+        setLiked(true);
+        setEventData({
+          ...eventData,
+          likes_count: (eventData.likes_count ?? 0) + 1,
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update like');
     }
   };
 
@@ -554,6 +579,15 @@ export function EventDetail() {
                   ) : (
                     'Attend Event'
                   )}
+                </Button>
+                <Separator />
+                <Button
+                  onClick={handleToggleLike}
+                  className="w-full"
+                  variant={liked ? 'secondary' : 'outline'}
+                >
+                  <Heart className={`w-4 h-4 mr-2 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+                  {liked ? 'Liked' : 'Like'} · {eventData.likes_count ?? 0}
                 </Button>
                 <Separator />
                 <div className="flex items-center gap-2">
