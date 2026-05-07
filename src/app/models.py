@@ -95,7 +95,7 @@ class Event(SQLModel, table=True):
     # Title is required and bounded in length by schema.
     title: str = Field(nullable=False, max_length=512)
     # Category is required and validated in `app.event_categories`.
-    category: str = Field(default="Technology", nullable=False, max_length=100, index=True)
+    category: str = Field(default="Entertainment", nullable=False, max_length=100, index=True)
     # Optional body/content.
     content: str | None = Field(default=None)
     # Optional imported-source information.

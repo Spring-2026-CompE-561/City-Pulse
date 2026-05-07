@@ -18,7 +18,7 @@ def _coerce_ingestion_category(category: str | None, fallback: str) -> str:
     for raw in (category, fallback):
         if raw and raw.strip() in ALLOWED_EVENT_CATEGORIES:
             return raw.strip()
-    return "Community"
+    return "Entertainment"
 
 
 # Older MySQL schemas may use a short VARCHAR for `events.content` (e.g. 500); stay under that.
@@ -122,7 +122,7 @@ async def upsert_normalized_event(
     now = datetime.now(UTC)
     normalized = _normalized_clamped_for_db(normalized)
     _ensure_discrete_event_shape(normalized)
-    safe_category = _coerce_ingestion_category(normalized.category, "Nightlife")
+    safe_category = _coerce_ingestion_category(normalized.category, "Nightlife (Bars & Clubs)")
     fingerprint = build_fingerprint(
         title=normalized.title,
         venue_name=normalized.venue_name,

@@ -19,14 +19,11 @@ export function CreateEvent() {
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
-    'Technology',
-    'Arts & Culture',
-    'Environment',
-    'Entertainment',
-    'Business',
-    'Food & Drink',
-    'Health & Wellness',
     'Music',
+    'Arts & Culture',
+    'Food & Drink',
+    'Entertainment',
+    'Nightlife (Bars & Clubs)',
   ]);
   const [formData, setFormData] = useState({
     title: '',

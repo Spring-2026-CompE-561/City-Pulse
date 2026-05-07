@@ -207,7 +207,7 @@ def _extract_organizer_from_html(html: str) -> str | None:
 
 
 def _stock_image_fallback(category: str | None, title: str) -> str:
-    seed = re.sub(r"[^a-z0-9]+", "-", f"{category or 'community'}-{title}".lower()).strip("-")
+    seed = re.sub(r"[^a-z0-9]+", "-", f"{category or 'entertainment'}-{title}".lower()).strip("-")
     seed = seed[:80] or "san-diego-event"
     return f"https://picsum.photos/seed/{seed}/1200/800"
 
@@ -600,7 +600,7 @@ def _build_normalized_event(
         external_url=canonical_url,
         canonical_url=canonical_url,
         title=title[:512],
-        category=source.category_hint or "Community",
+        category=source.category_hint or "Entertainment",
         content=content,
         organizer_name=organizer_name,
         event_image_url=chosen_image,

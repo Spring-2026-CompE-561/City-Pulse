@@ -138,7 +138,7 @@ async def list_events_with_interactions(
                     user_id=ev.user_id,
                     user_name=ev.user.name if ev.user else None,
                     title=ev.title or "Untitled event",
-                    category=ev.category or "Community",
+                    category=ev.category or "Entertainment",
                     content=content,
                     source_id=ev.source_id,
                     source_name=source_name,
