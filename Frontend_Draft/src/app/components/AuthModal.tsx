@@ -6,7 +6,6 @@ import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { getMe, login, register } from '../lib/api';
 import { setSession } from '../lib/storage';
-import { is_valid_email } from '../lib/validation';
 import { toast } from 'sonner';
 
 interface AuthModalProps {
@@ -20,16 +19,11 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
   const [loginPassword, setLoginPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [signupConfirmEmail, setSignupConfirmEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!is_valid_email(loginEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
     try {
       setIsSubmitting(true);
       const tokenPair = await login(loginEmail, loginPassword);
@@ -41,11 +35,11 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
       });
       toast.success(`Welcome back, ${currentUser.name}!`);
       setTimeout(() => {
-        onSuccess();
-        onOpenChange(false);
+          onSuccess();
+          onOpenChange(false);
       }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed");
+      toast.error(error instanceof Error ? error.message : 'Login failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -53,16 +47,8 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signupName || !signupEmail || !signupConfirmEmail || !signupPassword) {
+    if (!signupName || !signupEmail || !signupPassword) {
       toast.error('Please fill in all fields');
-      return;
-    }
-    if (!is_valid_email(signupEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-    if (signupEmail.trim().toLowerCase() !== signupConfirmEmail.trim().toLowerCase()) {
-      toast.error('Email confirmation does not match');
       return;
     }
     try {
@@ -81,7 +67,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         onOpenChange(false);
       }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sign up failed");
+      toast.error(error instanceof Error ? error.message : 'Sign up failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,17 +79,16 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         <DialogHeader>
           <DialogTitle>Welcome to CityPulse</DialogTitle>
           <DialogDescription>
-            Sign in or create an account to discover and attend events in your
-            city
+            Sign in or create an account to discover and attend events in your city
           </DialogDescription>
         </DialogHeader>
-
+        
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
-
+          
           <TabsContent value="login">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
@@ -133,7 +118,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
               </Button>
             </form>
           </TabsContent>
-
+          
           <TabsContent value="signup">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
@@ -158,17 +143,6 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signup-confirm-email">Confirm Email</Label>
-                <Input
-                  id="signup-confirm-email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={signupConfirmEmail}
-                  onChange={(e) => setSignupConfirmEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
                 <Input
                   id="signup-password"
@@ -180,8 +154,7 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Sign up creates your account in the backend with city location
-                set to San Diego.
+                Sign up creates your account in the backend with city location set to San Diego.
               </p>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 Create Account

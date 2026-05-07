@@ -6,15 +6,12 @@ __pycache__/
 .env.*
 !.env.docker.example
 *.env
-<<<<<<< feat/event-ingestion
 *.txt
-=======
 *.db
 *.db-*
 *.sqlite
 *.sqlite3
 
->>>>>>> main
 # Database files and dumps
 *.db
 *.sqlite
@@ -31,6 +28,8 @@ __pycache__/
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
 mySQL-authentication.txt
+frontend/node_modules/
+frontend/.next/
 node_modules/
 .next/
 dist/
