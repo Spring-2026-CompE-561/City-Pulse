@@ -83,6 +83,21 @@ export function CreateEvent() {
       toast.error('MAX description limit reached');
       return;
     }
+    if (formData.eventStartDate) {
+      const startDate = new Date(formData.eventStartDate);
+      const now = new Date();
+      if (startDate < now) {
+        toast.error('Start date cannot be in the past');
+        return;
+      }
+      if (formData.eventEndDate) {
+        const endDate = new Date(formData.eventEndDate);
+        if (endDate <= startDate) {
+          toast.error('End date must be after start date');
+          return;
+        }
+      }
+    }
     try {
       setIsSubmitting(true);
       if (!user) {
