@@ -11,27 +11,25 @@ import type {
   TokenPair,
   TrendEntryRead,
   UserRead,
-} from './contracts';
+} from "./contracts";
 import {
   clearAuthTokens,
   getAccessToken,
   getRefreshToken,
   setAccessToken,
   setRefreshToken,
-} from './storage';
+} from "./storage";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL
-  ?? process.env.VITE_API_BASE_URL
-  ?? '';
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? "";
 
 function build_api_url(path: string): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const base = API_BASE_URL.trim().replace(/\/+$/, '');
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const base = API_BASE_URL.trim().replace(/\/+$/, "");
   if (!base) {
     return normalizedPath;
   }
-  if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+  if (base.endsWith("/api") && normalizedPath.startsWith("/api/")) {
     return `${base}${normalizedPath.slice(4)}`;
   }
   return `${base}${normalizedPath}`;
@@ -41,15 +39,15 @@ export function build_media_url(path: string): string {
   if (!path) {
     return path;
   }
-  if (/^https?:\/\//i.test(path) || path.startsWith('data:')) {
+  if (/^https?:\/\//i.test(path) || path.startsWith("data:")) {
     return path;
   }
-  const base = API_BASE_URL.trim().replace(/\/+$/, '');
+  const base = API_BASE_URL.trim().replace(/\/+$/, "");
   if (!base) {
     return path;
   }
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  if (base.endsWith('/api')) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (base.endsWith("/api")) {
     return `${base.slice(0, -4)}${normalizedPath}`;
   }
   return `${base}${normalizedPath}`;
@@ -65,7 +63,7 @@ class ApiRequestError extends Error {
 
   constructor(message: string, status: number) {
     super(message);
-    this.name = 'ApiRequestError';
+    this.name = "ApiRequestError";
     this.status = status;
   }
 }
@@ -78,7 +76,7 @@ async function parse_error_message(response: Response): Promise<string> {
   let message = `Request failed (${response.status})`;
   try {
     const payload = (await response.json()) as { detail?: string };
-    if (typeof payload?.detail === 'string') {
+    if (typeof payload?.detail === "string") {
       message = payload.detail;
     }
   } catch {
@@ -88,40 +86,55 @@ async function parse_error_message(response: Response): Promise<string> {
 }
 
 function parse_refreshed_token(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') {
+  if (!payload || typeof payload !== "object") {
     return null;
   }
-  const tokenValue = (payload as { access_token?: unknown; accessToken?: unknown }).access_token
-    ?? (payload as { access_token?: unknown; accessToken?: unknown }).accessToken;
-  return typeof tokenValue === 'string' && tokenValue.trim() ? tokenValue : null;
+  const tokenValue =
+    (payload as { access_token?: unknown; accessToken?: unknown })
+      .access_token ??
+    (payload as { access_token?: unknown; accessToken?: unknown }).accessToken;
+  return typeof tokenValue === "string" && tokenValue.trim()
+    ? tokenValue
+    : null;
 }
 
 function parse_refresh_fallback_token(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') {
+  if (!payload || typeof payload !== "object") {
     return null;
   }
-  const refreshValue = (payload as { refresh_token?: unknown; refreshToken?: unknown }).refresh_token
-    ?? (payload as { refresh_token?: unknown; refreshToken?: unknown }).refreshToken;
-  return typeof refreshValue === 'string' && refreshValue.trim() ? refreshValue : null;
+  const refreshValue =
+    (payload as { refresh_token?: unknown; refreshToken?: unknown })
+      .refresh_token ??
+    (payload as { refresh_token?: unknown; refreshToken?: unknown })
+      .refreshToken;
+  return typeof refreshValue === "string" && refreshValue.trim()
+    ? refreshValue
+    : null;
 }
 
-async function try_refresh_with_options(path: string, init: RequestInit): Promise<string | null> {
+async function try_refresh_with_options(
+  path: string,
+  init: RequestInit,
+): Promise<string | null> {
   let response: Response;
   try {
     response = await fetch(build_api_url(path), {
       ...init,
-      credentials: 'same-origin',
+      credentials: "same-origin",
     });
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.');
+      throw new Error(
+        "Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.",
+      );
     }
     throw error;
   }
   if (!response.ok) {
     return null;
   }
-  const payload = response.status === 204 ? null : ((await response.json()) as unknown);
+  const payload =
+    response.status === 204 ? null : ((await response.json()) as unknown);
   const nextAccessToken = parse_refreshed_token(payload);
   if (!nextAccessToken) {
     return null;
@@ -135,7 +148,7 @@ async function try_refresh_with_options(path: string, init: RequestInit): Promis
 }
 
 async function refresh_access_token(): Promise<string | null> {
-  const refreshPaths = ['/api/auth/refresh', '/api/auth/refresh-token'];
+  const refreshPaths = ["/api/auth/refresh", "/api/auth/refresh-token"];
   const fallbackRefreshToken = getRefreshToken();
 
   if (!fallbackRefreshToken) {
@@ -144,8 +157,8 @@ async function refresh_access_token(): Promise<string | null> {
 
   for (const path of refreshPaths) {
     const bodyRefreshToken = await try_refresh_with_options(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: fallbackRefreshToken }),
     });
     if (bodyRefreshToken) {
@@ -156,16 +169,24 @@ async function refresh_access_token(): Promise<string | null> {
   return null;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}, alreadyRetried = false): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+  alreadyRetried = false,
+): Promise<T> {
   const { auth = false, authToken, headers, ...rest } = options;
   const nextHeaders = new Headers(headers ?? {});
-  if (rest.body && !(rest.body instanceof FormData) && !nextHeaders.has('Content-Type')) {
-    nextHeaders.set('Content-Type', 'application/json');
+  if (
+    rest.body &&
+    !(rest.body instanceof FormData) &&
+    !nextHeaders.has("Content-Type")
+  ) {
+    nextHeaders.set("Content-Type", "application/json");
   }
   if (auth) {
     const token = authToken ?? getAccessToken();
     if (token) {
-      nextHeaders.set('Authorization', `Bearer ${token}`);
+      nextHeaders.set("Authorization", `Bearer ${token}`);
     }
   }
 
@@ -174,11 +195,13 @@ async function request<T>(path: string, options: RequestOptions = {}, alreadyRet
     response = await fetch(build_api_url(path), {
       ...rest,
       headers: nextHeaders,
-      credentials: 'same-origin',
+      credentials: "same-origin",
     });
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error('Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.');
+      throw new Error(
+        "Unable to reach the API server. Check NEXT_PUBLIC_API_BASE_URL and backend availability.",
+      );
     }
     throw error;
   }
@@ -193,13 +216,16 @@ async function request<T>(path: string, options: RequestOptions = {}, alreadyRet
             ...options,
             authToken: refreshedAccessToken,
           },
-          true
+          true,
         );
       }
       clearAuthTokens();
-      throw new ApiRequestError('Session expired. Please sign in again.', 401);
+      throw new ApiRequestError("Session expired. Please sign in again.", 401);
     }
-    throw new ApiRequestError(await parse_error_message(response), response.status);
+    throw new ApiRequestError(
+      await parse_error_message(response),
+      response.status,
+    );
   }
 
   if (response.status === 204) {
@@ -209,59 +235,65 @@ async function request<T>(path: string, options: RequestOptions = {}, alreadyRet
 }
 
 export function login(email: string, password: string): Promise<TokenPair> {
-  return request<TokenPair>('/api/auth/login', {
-    method: 'POST',
+  return request<TokenPair>("/api/auth/login", {
+    method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
-export function register(name: string, email: string, password: string): Promise<TokenPair> {
-  return request<TokenPair>('/api/auth/register', {
-    method: 'POST',
+export function register(
+  name: string,
+  email: string,
+  password: string,
+): Promise<TokenPair> {
+  return request<TokenPair>("/api/auth/register", {
+    method: "POST",
     body: JSON.stringify({
       name,
       email,
       password,
-      city_location: 'san diego',
+      city_location: "san diego",
     }),
   });
 }
 
 export function getMe(accessToken?: string): Promise<UserRead> {
-  return request<UserRead>('/api/auth/me', {
+  return request<UserRead>("/api/auth/me", {
     auth: true,
     authToken: accessToken,
   });
 }
 
 export function listEventsWithInteractions(
-  filters: EventFilterParams = {}
+  filters: EventFilterParams = {},
 ): Promise<EventWithInteractionsRead[]> {
   const query = new URLSearchParams();
-  query.set('region', 'san diego');
-  if (filters.category && filters.category !== 'All Categories') {
-    query.set('category', filters.category);
+  query.set("region", "san diego");
+  if (filters.category && filters.category !== "All Categories") {
+    query.set("category", filters.category);
   }
   if (filters.neighborhood) {
-    query.set('neighborhood', filters.neighborhood);
+    query.set("neighborhood", filters.neighborhood);
   }
   if (filters.starts_after) {
-    query.set('starts_after', filters.starts_after);
+    query.set("starts_after", filters.starts_after);
   }
   if (filters.starts_before) {
-    query.set('starts_before', filters.starts_before);
+    query.set("starts_before", filters.starts_before);
   }
   // Trailing slash avoids FastAPI 307 redirects; redirect follow + credentialed fetch
   // often surfaces in the UI as a generic "Failed to fetch".
-  return request<EventWithInteractionsRead[]>(`/api/interactions/?${query.toString()}`);
+  return request<EventWithInteractionsRead[]>(
+    `/api/interactions/?${query.toString()}`,
+  );
 }
 
 export function listTrends(): Promise<TrendEntryRead[]> {
-  return request<TrendEntryRead[]>('/api/trends/?region=san%20diego');
+  return request<TrendEntryRead[]>("/api/trends/?region=san%20diego");
 }
 
 export function listCategories(): Promise<EventCategoryOptionsResponse> {
-  return request<EventCategoryOptionsResponse>('/api/events/categories');
+  return request<EventCategoryOptionsResponse>("/api/events/categories");
 }
 
 export function getEvent(id: number): Promise<EventRead> {
@@ -270,18 +302,20 @@ export function getEvent(id: number): Promise<EventRead> {
 
 export function createEvent(payload: EventCreateBody): Promise<EventRead> {
   // Use trailing slash to hit FastAPI route directly and avoid redirect auth/header issues.
-  return request<EventRead>('/api/events/', {
-    method: 'POST',
+  return request<EventRead>("/api/events/", {
+    method: "POST",
     auth: true,
     body: JSON.stringify(payload),
   });
 }
 
-export function uploadEventImage(file: File): Promise<EventImageUploadResponse> {
+export function uploadEventImage(
+  file: File,
+): Promise<EventImageUploadResponse> {
   const formData = new FormData();
-  formData.append('file', file);
-  return request<EventImageUploadResponse>('/api/events/upload-image', {
-    method: 'POST',
+  formData.append("file", file);
+  return request<EventImageUploadResponse>("/api/events/upload-image", {
+    method: "POST",
     auth: true,
     body: formData,
   });
@@ -289,38 +323,70 @@ export function uploadEventImage(file: File): Promise<EventImageUploadResponse> 
 
 export function deleteEvent(id: number): Promise<SuccessResponse> {
   return request<SuccessResponse>(`/api/events/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
     auth: true,
   });
 }
 
-export function updateEvent(id: number, payload: EventUpdateBody): Promise<SuccessResponse> {
+export function updateEvent(
+  id: number,
+  payload: EventUpdateBody,
+): Promise<SuccessResponse> {
   return request<SuccessResponse>(`/api/events/${id}`, {
-    method: 'PUT',
+    method: "PUT",
     auth: true,
     body: JSON.stringify(payload),
   });
 }
 
 export function addAttending(eventId: number): Promise<SuccessResponse> {
-  return request<SuccessResponse>(`/api/interactions/events/${eventId}/attending`, {
-    method: 'PUT',
-    auth: true,
-  });
+  return request<SuccessResponse>(
+    `/api/interactions/events/${eventId}/attending`,
+    {
+      method: "PUT",
+      auth: true,
+    },
+  );
 }
 
 export function removeAttending(eventId: number): Promise<SuccessResponse> {
-  return request<SuccessResponse>(`/api/interactions/events/${eventId}/attending`, {
-    method: 'DELETE',
-    auth: true,
-  });
+  return request<SuccessResponse>(
+    `/api/interactions/events/${eventId}/attending`,
+    {
+      method: "DELETE",
+      auth: true,
+    },
+  );
 }
 
-export function addComment(eventId: number, text: string): Promise<CommentRead> {
+export function addComment(
+  eventId: number,
+  text: string,
+): Promise<CommentRead> {
   return request<CommentRead>(`/api/interactions/events/${eventId}/comments`, {
-    method: 'PUT',
+    method: "PUT",
     auth: true,
     body: JSON.stringify({ text }),
   });
 }
 
+export function addLike(eventId: number): Promise<SuccessResponse> {
+  return request<SuccessResponse>(`/api/interactions/events/${eventId}/likes`, {
+    method: "PUT",
+    auth: true,
+  });
+}
+
+export function removeLike(eventId: number): Promise<SuccessResponse> {
+  return request<SuccessResponse>(`/api/interactions/events/${eventId}/likes`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export function removeComment(eventId: number, commentId: number): Promise<SuccessResponse> {
+  return request<SuccessResponse>(`/api/interactions/events/${eventId}/comments/${commentId}`, {
+    method: 'DELETE',
+    auth: true,
+  });
+}

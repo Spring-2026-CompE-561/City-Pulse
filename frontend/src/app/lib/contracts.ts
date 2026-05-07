@@ -86,6 +86,7 @@ export interface EventCreateBody {
   neighborhood?: string;
   price_info?: string;
   event_image_url?: string;
+  organizer_name?: string;
 }
 
 export interface EventUpdateBody {

@@ -225,12 +225,9 @@ export const cities = [
 
 export const categories = [
   'All Categories',
-  'Technology',
-  'Arts & Culture',
-  'Environment',
-  'Entertainment',
-  'Business',
-  'Food & Drink',
-  'Health & Wellness',
   'Music',
+  'Arts & Culture',
+  'Food & Drink',
+  'Entertainment',
+  'Nightlife (Bars & Clubs)',
 ];

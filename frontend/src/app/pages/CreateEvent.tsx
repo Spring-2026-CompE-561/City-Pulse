@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { createEvent, isAuthError, listCategories, uploadEventImage } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
 import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
+import { validate_post_quality } from '../lib/validation';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,17 +20,15 @@ export function CreateEvent() {
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
-    'Technology',
-    'Arts & Culture',
-    'Environment',
-    'Entertainment',
-    'Business',
-    'Food & Drink',
-    'Health & Wellness',
     'Music',
+    'Arts & Culture',
+    'Food & Drink',
+    'Entertainment',
+    'Nightlife (Bars & Clubs)',
   ]);
   const [formData, setFormData] = useState({
     title: '',
+    organizerName: '',
     description: '',
     category: '',
     neighborhood: '',
@@ -70,6 +69,16 @@ export function CreateEvent() {
       toast.error('Please fill in all required fields');
       return;
     }
+    const titleQualityError = validate_post_quality(formData.title, { minLength: 6, minWords: 2 });
+    if (titleQualityError) {
+      toast.error(`Title issue: ${titleQualityError}`);
+      return;
+    }
+    const descriptionQualityError = validate_post_quality(formData.description, { minLength: 20, minWords: 4 });
+    if (descriptionQualityError) {
+      toast.error(`Description issue: ${descriptionQualityError}`);
+      return;
+    }
     if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
       toast.error('MAX description limit reached');
       return;
@@ -89,6 +98,7 @@ export function CreateEvent() {
       await createEvent({
         user_id: user.id,
         title: formData.title,
+        organizer_name: formData.organizerName.trim() || undefined,
         category: formData.category,
         content: formData.description,
         neighborhood: formData.neighborhood || undefined,
@@ -209,6 +219,20 @@ export function CreateEvent() {
                   onChange={(e) => handleChange('title', e.target.value)}
                   required
                 />
+              </div>
+
+              {/* Organizer Label */}
+              <div className="space-y-2">
+                <Label htmlFor="organizerName">Organizer Label</Label>
+                <Input
+                  id="organizerName"
+                  placeholder="e.g., UC San Diego IEEE, North Park Community Council"
+                  value={formData.organizerName}
+                  onChange={(e) => handleChange('organizerName', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Use this when you are posting on behalf of another organizer.
+                </p>
               </div>
 
               {/* Description */}

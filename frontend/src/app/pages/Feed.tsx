@@ -1,30 +1,20 @@
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/router";
-import { EventCard } from "../components/EventCard";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import { Badge } from "../components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import {
-  getMe,
-  isAuthError,
-  listCategories,
-  listEventsWithInteractions,
-  listTrends,
-} from "../lib/api";
-import type { FeedEvent, UserRead } from "../lib/contracts";
-import { clearSession, getCurrentUser, setCurrentUser } from "../lib/storage";
-import { Search, TrendingUp, LogOut, Filter, Plus } from "lucide-react";
-import { toast } from "sonner";
-import logoImage from "../../imports/CityPulse_Logo.png";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { EventCard } from '../components/EventCard';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Badge } from '../components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { getMe, isAuthError, listCategories, listEventsWithInteractions, listTrends } from '../lib/api';
+import type { FeedEvent, UserRead } from '../lib/contracts';
+import { clearSession, getCurrentUser, getProfileOverride, setCurrentUser } from '../lib/storage';
+import { Search, TrendingUp, LogOut, Filter, Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import logoImage from '../../imports/CityPulse_Logo.png';
+
+const EVENTS_PER_PAGE = 9;
 
 export function Feed() {
   const router = useRouter();
@@ -41,6 +31,7 @@ export function Feed() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
 
   function startsAfterIsoFromDateInput(value: string): string | undefined {
     if (!value.trim()) {
@@ -141,8 +132,30 @@ export function Feed() {
       selectedCity === "San Diego, CA" || event.city === selectedCity;
     return matchesSearch && matchesCity;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
+  const pageStartIndex = (currentPage - 1) * EVENTS_PER_PAGE;
+  const paginatedEvents = filteredEvents.slice(pageStartIndex, pageStartIndex + EVENTS_PER_PAGE);
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, startPage + 4);
+  const visiblePageNumbers: number[] = [];
+  for (let pageNumber = Math.max(1, endPage - 4); pageNumber <= endPage; pageNumber += 1) {
+    visiblePageNumbers.push(pageNumber);
+  }
 
   const trendingEvents = filteredEvents.filter((event) => event.trending);
+  const profileOverride = user ? getProfileOverride(user.id) : null;
+  const displayName = profileOverride?.displayName || user?.name || 'User';
+  const profileImage = profileOverride?.avatarUrl || '';
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedNeighborhood, startDate]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   if (loading) {
     return (
@@ -199,10 +212,10 @@ export function Feed() {
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src="" alt={user.name} />
-                    <AvatarFallback>{user.name[0]}</AvatarFallback>
+                    <AvatarImage src={profileImage} alt={displayName} />
+                    <AvatarFallback>{displayName[0]}</AvatarFallback>
                   </Avatar>
-                  <span className="hidden sm:inline">{user.name}</span>
+                  <span className="hidden sm:inline">{displayName}</span>
                 </Button>
               </Link>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -217,8 +230,8 @@ export function Feed() {
         {/* Welcome Section */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-              Welcome back, {user.name}!
+            <h1 className="text-3xl font-bold mb-2">
+              Welcome back, {displayName}!
             </h1>
             <p className="text-muted-foreground">
               Discover events happening in{" "}
@@ -263,9 +276,10 @@ export function Feed() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setSelectedCategory("All Categories");
-                    setSelectedNeighborhood("All Neighborhoods");
-                    setStartDate("");
+                    setSelectedCategory('All Categories');
+                    setSelectedNeighborhood('All Neighborhoods');
+                    setStartDate('');
+                    setCurrentPage(1);
                     setRefreshToken((value) => value + 1);
                   }}
                 >
@@ -379,19 +393,52 @@ export function Feed() {
               </p>
               <Button
                 onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory("All Categories");
+                  setSearchQuery('');
+                  setSelectedCategory('All Categories');
+                  setCurrentPage(1);
                 }}
               >
                 Clear All Filters
               </Button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
+            <>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+              {filteredEvents.length > EVENTS_PER_PAGE && (
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  {visiblePageNumbers.map((pageNumber) => (
+                    <Button
+                      key={pageNumber}
+                      variant={pageNumber === currentPage ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

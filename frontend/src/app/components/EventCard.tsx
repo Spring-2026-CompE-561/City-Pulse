@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
 import { build_media_url } from '../lib/api';
+import { parse_api_datetime } from '../lib/datetime';
 import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
+import { getProfileOverride } from '../lib/storage';
 import { Badge } from './ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Card, CardContent, CardFooter, CardHeader } from './ui/card';
 import { Calendar, ExternalLink, FileText, MapPin, TrendingUp, Users } from 'lucide-react';
 
@@ -11,16 +14,19 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
-  const eventDate = new Date(event.event_start_at ?? event.created_at);
+  const eventDate = parse_api_datetime(event.event_start_at ?? event.created_at) ?? new Date();
   const uploadedImage = event.event_image_url ? build_media_url(event.event_image_url) : null;
   const isPdfMedia = uploadedImage?.toLowerCase().endsWith('.pdf') ?? false;
   const eventImage = !isPdfMedia
     ? (uploadedImage ?? CATEGORY_IMAGES[event.category] ?? DEFAULT_CATEGORY_IMAGE)
     : null;
+  const organizerOverride = event.user_id ? getProfileOverride(event.user_id) : null;
 
-  const organizerLabel = event.origin_type === 'user'
-    ? (event.user_name ?? `user #${event.user_id ?? 'unknown'}`)
-    : (event.organizer_name ?? event.venue_name ?? event.user_name ?? 'Event Organizer');
+  const organizerLabel = event.organizer_name
+    ?? organizerOverride?.displayName
+    ?? event.user_name
+    ?? event.venue_name
+    ?? `user #${event.user_id ?? 'unknown'}`;
 
   return (
     <Link href={`/event/${event.id}`}>
@@ -87,8 +93,12 @@ export function EventCard({ event }: EventCardProps) {
         </CardContent>
 
         <CardFooter className="border-t pt-4">
-          <div className="text-sm text-muted-foreground">
-            Organizer: {organizerLabel}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Avatar className="w-7 h-7">
+              <AvatarImage src={organizerOverride?.avatarUrl || ''} alt={organizerLabel} />
+              <AvatarFallback>{organizerLabel[0] ?? 'O'}</AvatarFallback>
+            </Avatar>
+            <span>Organizer: {organizerLabel}</span>
           </div>
         </CardFooter>
       </Card>

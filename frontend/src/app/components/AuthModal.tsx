@@ -1,18 +1,13 @@
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { getMe, login, register } from "../lib/api";
-import { setSession } from "../lib/storage";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { getMe, login, register } from '../lib/api';
+import { setSession } from '../lib/storage';
+import { is_valid_email } from '../lib/validation';
+import { toast } from 'sonner';
 
 interface AuthModalProps {
   open: boolean;
@@ -21,15 +16,20 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupConfirmEmail, setSignupConfirmEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!is_valid_email(loginEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
     try {
       setIsSubmitting(true);
       const tokenPair = await login(loginEmail, loginPassword);
@@ -53,8 +53,16 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signupName || !signupEmail || !signupPassword) {
-      toast.error("Please fill in all fields");
+    if (!signupName || !signupEmail || !signupConfirmEmail || !signupPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+    if (!is_valid_email(signupEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    if (signupEmail.trim().toLowerCase() !== signupConfirmEmail.trim().toLowerCase()) {
+      toast.error('Email confirmation does not match');
       return;
     }
     try {
@@ -146,6 +154,17 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                   placeholder="john@example.com"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-confirm-email">Confirm Email</Label>
+                <Input
+                  id="signup-confirm-email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={signupConfirmEmail}
+                  onChange={(e) => setSignupConfirmEmail(e.target.value)}
                   required
                 />
               </div>

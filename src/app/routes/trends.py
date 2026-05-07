@@ -32,6 +32,7 @@ def _order_key(item: tuple) -> tuple:
     return (-att, -com, -lik)
 
 
+@router.get("", response_model=list[TrendEntryRead], include_in_schema=False)
 @router.get("/", response_model=list[TrendEntryRead])
 async def get_trends(
     region: str | int = Query("san diego", description="Region: 'san diego' or 0"),
