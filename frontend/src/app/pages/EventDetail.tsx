@@ -26,7 +26,7 @@ import {
   updateEvent as updateEventRequest,
 } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
-import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
+import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE, normalizeEventCategory } from '../lib/constants';
 import { parse_api_datetime } from '../lib/datetime';
 import { clearSession, getCurrentUser, getProfileOverride, isAttending, rememberAttending } from '../lib/storage';
 import { validate_post_quality } from '../lib/validation';
@@ -73,12 +73,12 @@ export function EventDetail() {
     'Food & Drink',
     'Health & Wellness',
     'Music',
+    'Nightlife (Bars & Clubs)',
   ]);
   const [editForm, setEditForm] = useState({
     title: '',
     category: '',
     content: '',
-    neighborhood: '',
     venueName: '',
     venueAddress: '',
     priceInfo: '',
@@ -284,7 +284,6 @@ export function EventDetail() {
       title: eventData.title,
       category: eventData.category,
       content: eventData.content ?? '',
-      neighborhood: eventData.neighborhood ?? '',
       venueName: eventData.venue_name ?? '',
       venueAddress: eventData.venue_address ?? '',
       priceInfo: eventData.price_info ?? '',
@@ -329,9 +328,8 @@ export function EventDetail() {
         : null;
       await updateEventRequest(eventId, {
         title: editForm.title.trim(),
-        category: editForm.category.trim(),
+        category: normalizeEventCategory(editForm.category.trim(), editForm.venueName),
         content: editForm.content.trim() || undefined,
-        neighborhood: editForm.neighborhood.trim() || undefined,
         venue_name: editForm.venueName.trim() || undefined,
         venue_address: editForm.venueAddress.trim() || undefined,
         price_info: editForm.priceInfo.trim() || undefined,
@@ -359,8 +357,9 @@ export function EventDetail() {
   const startDate = parse_api_datetime(eventData.event_start_at);
   const uploadedImage = eventData.event_image_url ? build_media_url(eventData.event_image_url) : null;
   const isPdfMedia = uploadedImage?.toLowerCase().endsWith('.pdf') ?? false;
+  const displayCategory = normalizeEventCategory(eventData.category, eventData.venue_name);
   const eventImage = !isPdfMedia
-    ? (uploadedImage ?? CATEGORY_IMAGES[eventData.category] ?? DEFAULT_CATEGORY_IMAGE)
+    ? (uploadedImage ?? CATEGORY_IMAGES[displayCategory] ?? DEFAULT_CATEGORY_IMAGE)
     : null;
   const currentUserOverride = getProfileOverride(user.id);
   const navbarDisplayName = currentUserOverride?.displayName || user.name;
@@ -371,7 +370,6 @@ export function EventDetail() {
   const mapQueryParts = [
     eventData.venue_name?.trim(),
     eventData.venue_address?.trim(),
-    eventData.neighborhood?.trim(),
   ].filter((part): part is string => Boolean(part));
   const mapQuery = mapQueryParts.join(', ');
   const mapEmbedUrl = mapQuery
@@ -455,7 +453,7 @@ export function EventDetail() {
           <div className="lg:col-span-2 space-y-6">
             <div>
               <Badge variant="secondary" className="mb-3">
-                {eventData.category}
+                {displayCategory}
               </Badge>
               <h1 className="text-4xl font-bold mb-4">{eventData.title}</h1>
               <div className="mb-2 flex items-center gap-2">
@@ -493,7 +491,6 @@ export function EventDetail() {
                     <div className="text-sm text-muted-foreground">Location</div>
                     <div className="font-semibold">
                       {eventData.venue_name ?? 'San Diego Venue'}
-                      {eventData.neighborhood ? ` · ${eventData.neighborhood}` : ''}
                     </div>
                   </div>
                 </CardContent>
@@ -701,14 +698,6 @@ export function EventDetail() {
                 rows={3}
                 value={editForm.content}
                 onChange={(e) => handleEditFieldChange('content', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-neighborhood">Neighborhood</Label>
-              <Input
-                id="edit-neighborhood"
-                value={editForm.neighborhood}
-                onChange={(e) => handleEditFieldChange('neighborhood', e.target.value)}
               />
             </div>
             <div className="space-y-2">

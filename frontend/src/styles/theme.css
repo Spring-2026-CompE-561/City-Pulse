@@ -184,3 +184,14 @@
     line-height: 1.5;
   }
 }
+
+.event-date-filter-input[type="date"] {
+  position: relative;
+  text-align: left;
+}
+
+.event-date-filter-input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.35rem;
+  margin: 0;
+}

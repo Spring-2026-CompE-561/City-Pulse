@@ -23,6 +23,12 @@ export function Landing() {
   useEffect(() => {
     let isMounted = true;
     const bootstrapSession = async () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('auth') === 'reset') {
+          setShowAuth(true);
+        }
+      }
       if (!hasValidSession()) {
         return;
       }

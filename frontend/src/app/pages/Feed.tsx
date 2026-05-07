@@ -24,7 +24,6 @@ export function Feed() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('San Diego, CA');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState('All Neighborhoods');
   const [startDate, setStartDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,17 +41,6 @@ export function Feed() {
     }
     return parsed.toISOString();
   }
-
-  const neighborhoods = [
-    'All Neighborhoods',
-    'Hillcrest',
-    'North Park',
-    'Gaslamp',
-    'Pacific Beach',
-    'Little Italy',
-    'Ocean Beach',
-    'Mission Beach',
-  ];
 
   useEffect(() => {
     let isMounted = true;
@@ -72,8 +60,6 @@ export function Feed() {
           getMe(),
           listEventsWithInteractions({
             category: selectedCategory,
-            neighborhood:
-              selectedNeighborhood === 'All Neighborhoods' ? undefined : selectedNeighborhood,
             starts_after: startsAfterIsoFromDateInput(startDate),
           }),
           listTrends(),
@@ -112,7 +98,7 @@ export function Feed() {
     return () => {
       isMounted = false;
     };
-  }, [router, refreshToken, selectedCategory, selectedNeighborhood, startDate]);
+  }, [router, refreshToken, selectedCategory, startDate]);
 
   const handleLogout = () => {
     clearSession();
@@ -143,7 +129,7 @@ export function Feed() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedNeighborhood, startDate]);
+  }, [searchQuery, selectedCategory, startDate]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -250,13 +236,12 @@ export function Feed() {
                 <Filter className="w-4 h-4" />
                 Filters
               </Button>
-              {(selectedCategory !== 'All Categories' || selectedNeighborhood !== 'All Neighborhoods' || startDate) && (
+              {(selectedCategory !== 'All Categories' || startDate) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setSelectedCategory('All Categories');
-                    setSelectedNeighborhood('All Neighborhoods');
                     setStartDate('');
                     setCurrentPage(1);
                     setRefreshToken((value) => value + 1);
@@ -268,7 +253,7 @@ export function Feed() {
             </div>
 
             {showFilters && (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">City</label>
                   <Select value={selectedCity} disabled>
@@ -298,27 +283,12 @@ export function Feed() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Neighborhood</label>
-                  <Select value={selectedNeighborhood} onValueChange={setSelectedNeighborhood}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {neighborhoods.map((neighborhood) => (
-                        <SelectItem key={neighborhood} value={neighborhood}>
-                          {neighborhood}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Start Date</label>
+                  <label className="text-sm font-medium">Event Date</label>
                   <Input
                     type="date"
                     value={startDate}
                     onChange={(event) => setStartDate(event.target.value)}
+                    className="event-date-filter-input"
                   />
                 </div>
               </div>

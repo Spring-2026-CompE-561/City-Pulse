@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { createEvent, isAuthError, listCategories, uploadEventImage } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
+import { normalizeEventCategory } from '../lib/constants';
 import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
 import { validate_post_quality } from '../lib/validation';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
@@ -31,7 +32,6 @@ export function CreateEvent() {
     organizerName: '',
     description: '',
     category: '',
-    neighborhood: '',
     venueName: '',
     venueAddress: '',
     priceInfo: '',
@@ -99,9 +99,8 @@ export function CreateEvent() {
         user_id: user.id,
         title: formData.title,
         organizer_name: formData.organizerName.trim() || undefined,
-        category: formData.category,
+        category: normalizeEventCategory(formData.category, formData.venueName),
         content: formData.description,
-        neighborhood: formData.neighborhood || undefined,
         venue_name: formData.venueName || undefined,
         venue_address: formData.venueAddress || undefined,
         price_info: formData.priceInfo || undefined,
@@ -270,15 +269,6 @@ export function CreateEvent() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="neighborhood">Neighborhood</Label>
-                  <Input
-                    id="neighborhood"
-                    placeholder="e.g., North Park"
-                    value={formData.neighborhood}
-                    onChange={(e) => handleChange('neighborhood', e.target.value)}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="venueName">Venue</Label>
                   <Input

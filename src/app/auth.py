@@ -119,6 +119,31 @@ def create_refresh_token(user_id: int) -> str:
     )
 
 
+def create_password_reset_token(email: str, access_code_signature: str) -> str:
+    """
+    Create a signed short-lived JWT token for password reset.
+
+    Payload includes:
+    - `sub`: normalized user email
+    - `type`: "password_reset"
+    - `code_signature`: HMAC signature of one-time access code
+    """
+    now = datetime.now(UTC)
+    expires = now + timedelta(minutes=settings.password_reset_expire_minutes)
+    payload = {
+        "sub": email.strip().lower(),
+        "type": "password_reset",
+        "code_signature": access_code_signature,
+        "iat": int(now.timestamp()),
+        "exp": int(expires.timestamp()),
+    }
+    return jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
 def decode_access_token(token: str) -> dict | None:
     """
     Validate an access token and return its payload, or None.
@@ -169,6 +194,31 @@ def decode_refresh_token(token: str) -> dict | None:
     if "sub" not in payload:
         return None
     return {"sub": str(payload["sub"])}
+
+
+def decode_password_reset_token(token: str) -> dict | None:
+    """
+    Validate a password reset token and return required claims, or None.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.InvalidTokenError:
+        return None
+    if payload.get("type") != "password_reset":
+        return None
+    subject = payload.get("sub")
+    code_signature = payload.get("code_signature")
+    if not isinstance(subject, str) or not subject.strip():
+        return None
+    if not isinstance(code_signature, str) or not code_signature.strip():
+        return None
+    return {"sub": subject.strip().lower(), "code_signature": code_signature}
 
 
 async def get_current_user(

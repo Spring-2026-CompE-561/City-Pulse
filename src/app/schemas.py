@@ -86,6 +86,20 @@ class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1, description="Refresh token received from register or login.")
 
 
+class PasswordResetRequest(BaseModel):
+    """Body for POST /api/auth/forgot-password to send a reset email."""
+
+    email: str = Field(..., min_length=1, max_length=255, description="Registered account email.")
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Body for POST /api/auth/reset-password to confirm a password reset."""
+
+    token: str = Field(..., min_length=1, description="Password reset token from email link.")
+    access_code: str = Field(..., min_length=1, max_length=32, description="One-time access code from email.")
+    new_password: str = Field(..., min_length=1, description="New password to store for the account.")
+
+
 # ----- Region -----
 class RegionRead(BaseModel):
     """Region: id and name (filing cabinet for events/users)."""

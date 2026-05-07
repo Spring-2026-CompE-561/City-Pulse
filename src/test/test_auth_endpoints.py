@@ -80,3 +80,64 @@ def test_me_requires_bearer_token(monkeypatch):
     app.dependency_overrides.clear()
     assert response.status_code == 401
 
+
+def test_forgot_password_returns_success(monkeypatch):
+    async def _fake_send_password_reset_instructions(_db, email: str):
+        return None
+
+    monkeypatch.setattr(
+        auth_router_module,
+        "send_password_reset_instructions",
+        _fake_send_password_reset_instructions,
+    )
+    client = _build_client(monkeypatch)
+    response = client.post("/api/auth/forgot-password", json={"email": "user@example.com"})
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
+def test_reset_password_invalid_token_or_code(monkeypatch):
+    async def _fake_reset_password_with_token(*_args, **_kwargs):
+        return False
+
+    monkeypatch.setattr(
+        auth_router_module,
+        "reset_password_with_token",
+        _fake_reset_password_with_token,
+    )
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/api/auth/reset-password",
+        json={
+            "token": "bad",
+            "access_code": "123456",
+            "new_password": "new-secret",
+        },
+    )
+    app.dependency_overrides.clear()
+    assert response.status_code == 400
+
+
+def test_reset_password_success(monkeypatch):
+    async def _fake_reset_password_with_token(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(
+        auth_router_module,
+        "reset_password_with_token",
+        _fake_reset_password_with_token,
+    )
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/api/auth/reset-password",
+        json={
+            "token": "valid-token",
+            "access_code": "123456",
+            "new_password": "new-secret",
+        },
+    )
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from app.event_metadata import clean_event_description, clean_organizer_name
-from app.event_categories import ALLOWED_EVENT_CATEGORIES
+from app.event_categories import ALLOWED_EVENT_CATEGORIES, normalize_event_category
 from app.ingestion.dedupe import build_content_signature, build_fingerprint, normalize_url
 from app.ingestion.types import NormalizedEvent
 from app.models import Event
@@ -17,9 +17,18 @@ from app.repository.event import create_event, update_event_fields
 
 def _coerce_ingestion_category(category: str | None, fallback: str) -> str:
     for raw in (category, fallback):
-        if raw and raw.strip() in ALLOWED_EVENT_CATEGORIES:
-            return raw.strip()
+        if not raw:
+            continue
+        normalized = normalize_event_category(raw.strip())
+        if normalized in ALLOWED_EVENT_CATEGORIES:
+            return normalized
     return "Entertainment"
+
+
+def _is_whistle_stop_event(normalized: NormalizedEvent) -> bool:
+    canonical = (normalized.canonical_url or "").lower()
+    venue_name = (normalized.venue_name or "").lower()
+    return "whistlestopbar.com" in canonical or "whistle stop" in venue_name
 
 
 # Older MySQL schemas may use a short VARCHAR for `events.content` (e.g. 500); stay under that.
@@ -145,6 +154,8 @@ async def upsert_normalized_event(
     normalized = _normalized_clamped_for_db(normalized)
     _ensure_discrete_event_shape(normalized)
     safe_category = _coerce_ingestion_category(normalized.category, "Nightlife (Bars & Clubs)")
+    if _is_whistle_stop_event(normalized):
+        safe_category = "Nightlife (Bars & Clubs)"
     fingerprint = build_fingerprint(
         title=normalized.title,
         venue_name=normalized.venue_name,

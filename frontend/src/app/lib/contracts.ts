@@ -107,6 +107,16 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export interface PasswordResetRequestBody {
+  email: string;
+}
+
+export interface PasswordResetConfirmBody {
+  token: string;
+  access_code: string;
+  new_password: string;
+}
+
 export interface EventImageUploadResponse {
   url: string;
 }

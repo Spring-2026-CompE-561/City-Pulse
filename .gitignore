@@ -6,15 +6,13 @@ __pycache__/
 .env.*
 !.env.docker.example
 *.env
-<<<<<<< feat/event-ingestion
 *.txt
-=======
 *.db
 *.db-*
 *.sqlite
 *.sqlite3
-
->>>>>>> main
+*.sql
+docker/mysql/init/*.sql
 # Database files and dumps
 *.db
 *.sqlite
@@ -39,3 +37,6 @@ playwright-report/
 test-results/
 nohup.out
 uvicorn.log
+docker/mysql/init/01-city-pulse-seed.sql
+docker/mysql/init/01-city-pulse-seed.sql
+/docker
