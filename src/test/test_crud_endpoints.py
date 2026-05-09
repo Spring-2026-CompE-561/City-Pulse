@@ -61,6 +61,8 @@ def test_list_users_endpoint(monkeypatch):
 
 
 def test_list_events_endpoint(monkeypatch):
+    called = {"cleanup": False}
+
     async def _fake_list_events(_db, region_id, skip, limit, category=None, **kwargs):
         return [
             Event(
@@ -74,7 +76,18 @@ def test_list_events_endpoint(monkeypatch):
             )
         ]
 
+    async def _fake_delete_past_events(_db, *, region_id, retention_cutoff):
+        called["cleanup"] = True
+        assert region_id == 0
+        assert retention_cutoff.tzinfo is not None
+        return 0
+
     monkeypatch.setattr(events_router_module, "list_events_by_region", _fake_list_events)
+    monkeypatch.setattr(
+        events_router_module,
+        "delete_past_events_older_than",
+        _fake_delete_past_events,
+    )
     client = _build_client(monkeypatch)
     response = client.get("/api/events")
     app.dependency_overrides.clear()
@@ -83,6 +96,7 @@ def test_list_events_endpoint(monkeypatch):
     assert len(items) == 1
     assert items[0]["title"] == "Picnic"
     assert items[0]["category"] == "Food & Drink"
+    assert called["cleanup"] is True
 
 
 def test_list_event_categories_endpoint(monkeypatch):

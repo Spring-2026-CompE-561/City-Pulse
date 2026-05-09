@@ -1,7 +1,8 @@
 """Interactions API: list events with interactions; add/remove likes, comments, attending."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,11 @@ from app.event_metadata import clean_event_description, extract_organizer_name
 from app.exceptions import forbidden
 from app.models import User
 from app.region_map import parse_region_param
-from app.repository.event import get_event_by_id, list_events_by_region
+from app.repository.event import (
+    delete_past_events_older_than,
+    get_event_by_id,
+    list_events_by_region,
+)
 from app.repository.interaction import (
     add_attending as add_attending_row,
 )
@@ -48,6 +53,22 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api/interactions", tags=["Interactions"])
 logger = logging.getLogger(__name__)
+PAST_EVENT_RETENTION_DAYS = 7
+
+
+def resolve_feed_timezone() -> tzinfo:
+    try:
+        return ZoneInfo("America/Los_Angeles")
+    except ZoneInfoNotFoundError:
+        return UTC
+
+
+FEED_TIMEZONE = resolve_feed_timezone()
+
+
+def current_feed_time() -> datetime:
+    """Return current local feed time used for active event filtering."""
+    return datetime.now(FEED_TIMEZONE)
 
 
 @router.get("", response_model=list[EventWithInteractionsRead], include_in_schema=False)
@@ -79,6 +100,13 @@ async def list_events_with_interactions(
             parsed_starts_before = datetime.fromisoformat(starts_before.replace("Z", "+00:00"))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid starts_before datetime format") from exc
+    now_local = current_feed_time()
+    retention_cutoff = now_local - timedelta(days=PAST_EVENT_RETENTION_DAYS)
+    await delete_past_events_older_than(
+        db,
+        region_id=region_id,
+        retention_cutoff=retention_cutoff,
+    )
     events = await list_events_by_region(
         db,
         region_id=region_id,
@@ -88,6 +116,7 @@ async def list_events_with_interactions(
         neighborhood=neighborhood,
         starts_after=parsed_starts_after,
         starts_before=parsed_starts_before,
+        active_after=now_local,
     )
     out = []
     for ev in events:
