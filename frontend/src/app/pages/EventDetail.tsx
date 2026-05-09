@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -165,7 +166,7 @@ export function EventDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Loading event details...</p>
       </div>
     );
@@ -174,7 +175,7 @@ export function EventDetail() {
   if (!eventData || !user) {
     if (loadError) {
       return (
-        <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <div className="min-h-screen bg-background grid place-items-center">
           <div className="text-center space-y-4">
             <p className="text-muted-foreground">{loadError}</p>
             <Button onClick={() => router.push('/feed')}>Back to Feed</Button>
@@ -411,8 +412,8 @@ export function EventDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
+    <div className="min-h-screen bg-background">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0">
@@ -436,6 +437,7 @@ export function EventDetail() {
               </Link>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              <ThemeToggle />
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="gap-2 max-w-[12rem] sm:max-w-none">
                   <Avatar className="w-8 h-8 shrink-0">
@@ -521,7 +523,7 @@ export function EventDetail() {
                 </CardContent>
               </Card>
               <Card className="sm:col-span-2">
-                <CardContent className="p-0 overflow-hidden h-72 bg-gray-200 relative">
+                <CardContent className="p-0 overflow-hidden h-72 bg-muted relative">
                   {mapEmbedUrl ? (
                     <iframe
                       title="Event location map"
@@ -542,7 +544,7 @@ export function EventDetail() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="bg-white/95"
+                      className="bg-background/95"
                       onClick={() => window.open(mapSearchUrl, '_blank', 'noopener,noreferrer')}
                     >
                       View on Google Maps

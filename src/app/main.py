@@ -85,6 +85,11 @@ async def log_requests(request: Request, call_next):
 async def global_exception_handler(request: Request, exc: Exception):
     if isinstance(exc, HTTPException):
         raise exc
+    logger.exception(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+    )
     detail = "Internal server error"
     if settings.debug:
         detail = f"{type(exc).__name__}: {exc!s}"
