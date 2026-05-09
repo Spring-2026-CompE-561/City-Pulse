@@ -42,3 +42,4 @@ uvicorn.log
 docker/mysql/init/01-city-pulse-seed.sql
 docker/mysql/init/01-city-pulse-seed.sql
 /docker
+/docker/mysql/init
