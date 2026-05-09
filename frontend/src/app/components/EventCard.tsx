@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { FeedEvent } from '../lib/contracts';
 import { build_media_url } from '../lib/api';
 import { parse_api_datetime } from '../lib/datetime';
-import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE } from '../lib/constants';
+import { CATEGORY_IMAGES, DEFAULT_CATEGORY_IMAGE, normalizeEventCategory } from '../lib/constants';
 import { getProfileOverride } from '../lib/storage';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -15,10 +15,11 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const eventDate = parse_api_datetime(event.event_start_at ?? event.created_at) ?? new Date();
+  const displayCategory = normalizeEventCategory(event.category, event.venue_name);
   const uploadedImage = event.event_image_url ? build_media_url(event.event_image_url) : null;
   const isPdfMedia = uploadedImage?.toLowerCase().endsWith('.pdf') ?? false;
   const eventImage = !isPdfMedia
-    ? (uploadedImage ?? CATEGORY_IMAGES[event.category] ?? DEFAULT_CATEGORY_IMAGE)
+    ? (uploadedImage ?? CATEGORY_IMAGES[displayCategory] ?? DEFAULT_CATEGORY_IMAGE)
     : null;
   const organizerOverride = event.user_id ? getProfileOverride(event.user_id) : null;
 
@@ -55,7 +56,7 @@ export function EventCard({ event }: EventCardProps) {
             <div className="flex-1">
               <h3 className="font-semibold line-clamp-2">{event.title}</h3>
               <Badge variant="secondary" className="mt-2">
-                {event.category}
+                {displayCategory}
               </Badge>
             </div>
           </div>
@@ -74,7 +75,7 @@ export function EventCard({ event }: EventCardProps) {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="w-4 h-4" />
             <span className="line-clamp-1">
-              {event.neighborhood ? `${event.neighborhood}, ` : ''}{event.city}
+              {event.city}
             </span>
           </div>
 

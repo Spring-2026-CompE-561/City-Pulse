@@ -192,7 +192,19 @@ async def _normalize_event_categories(conn: AsyncConnection) -> None:
     await conn.execute(
         text(
             "UPDATE events SET category = CASE "
-            "WHEN category = 'Nightlife' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(category) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN source_id IN ("
+            "SELECT id FROM sources "
+            "WHERE LOWER(COALESCE(category_hint, '')) IN ('nightlife', 'nightlife (bars & clubs)')"
+            ") THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN source_id IN ("
+            "SELECT id FROM sources "
+            "WHERE LOWER(COALESCE(domain, '')) = 'whistlestopbar.com' "
+            "OR LOWER(COALESCE(name, '')) = 'whistle stop events'"
+            ") THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(venue_name, '')) LIKE '%whistle stop%' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(canonical_url, '')) LIKE '%whistlestopbar.com%' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(venue_name, '')) LIKE '%bar%' THEN 'Nightlife (Bars & Clubs)' "
             "WHEN category = 'Music' THEN 'Music' "
             "WHEN category = 'Arts & Culture' THEN 'Arts & Culture' "
             "WHEN category = 'Food & Drink' THEN 'Food & Drink' "
@@ -203,7 +215,7 @@ async def _normalize_event_categories(conn: AsyncConnection) -> None:
     await conn.execute(
         text(
             "UPDATE partner_submissions SET category = CASE "
-            "WHEN category = 'Nightlife' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(category) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
             "WHEN category = 'Music' THEN 'Music' "
             "WHEN category = 'Arts & Culture' THEN 'Arts & Culture' "
             "WHEN category = 'Food & Drink' THEN 'Food & Drink' "
@@ -214,7 +226,9 @@ async def _normalize_event_categories(conn: AsyncConnection) -> None:
     await conn.execute(
         text(
             "UPDATE sources SET category_hint = CASE "
-            "WHEN category_hint = 'Nightlife' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(domain, '')) = 'whistlestopbar.com' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(name, '')) = 'whistle stop events' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(category_hint) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
             "WHEN category_hint = 'Music' THEN 'Music' "
             "WHEN category_hint = 'Arts & Culture' THEN 'Arts & Culture' "
             "WHEN category_hint = 'Food & Drink' THEN 'Food & Drink' "

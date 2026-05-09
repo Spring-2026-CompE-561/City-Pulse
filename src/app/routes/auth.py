@@ -9,12 +9,23 @@ from app.database import get_db
 from app.exceptions import bad_request, conflict, unauthorized
 from app.models import User
 from app.repository.user import delete_user_and_events
-from app.schemas import LoginRequest, RefreshRequest, SuccessResponse, UserCreate, UserDeleteBody, UserRead
+from app.schemas import (
+    LoginRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    RefreshRequest,
+    SuccessResponse,
+    UserCreate,
+    UserDeleteBody,
+    UserRead,
+)
 from app.services.auth_service import (
     build_token_pair,
     is_duplicate_email_error,
     login_user,
+    reset_password_with_token,
     register_user,
+    send_password_reset_instructions,
     user_to_public,
 )
 
@@ -84,6 +95,40 @@ async def refresh(payload: RefreshRequest):
     except (ValueError, TypeError):
         raise unauthorized("Invalid refresh token") from None
     return build_token_pair(user_id)
+
+
+@router.post("/forgot-password", response_model=SuccessResponse)
+async def forgot_password(
+    payload: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    **Send password reset instructions** to a registered user email.
+
+    Always returns success to avoid exposing whether an email exists.
+    Email contains both a reset link and one-time access code.
+    """
+    await send_password_reset_instructions(db, email=payload.email)
+    return SuccessResponse()
+
+
+@router.post("/reset-password", response_model=SuccessResponse)
+async def reset_password(
+    payload: PasswordResetConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    **Reset password** using reset token from the email link and access code.
+    """
+    updated = await reset_password_with_token(
+        db,
+        token=payload.token,
+        access_code=payload.access_code,
+        new_password=payload.new_password,
+    )
+    if not updated:
+        raise bad_request("Invalid or expired reset token/code")
+    return SuccessResponse()
 
 
 @router.get("/me", response_model=UserRead)

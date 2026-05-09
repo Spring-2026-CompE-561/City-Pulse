@@ -7,6 +7,8 @@ import type {
   EventRead,
   EventUpdateBody,
   EventWithInteractionsRead,
+  PasswordResetConfirmBody,
+  PasswordResetRequestBody,
   SuccessResponse,
   TokenPair,
   TrendEntryRead,
@@ -261,6 +263,20 @@ export function getMe(accessToken?: string): Promise<UserRead> {
   return request<UserRead>("/api/auth/me", {
     auth: true,
     authToken: accessToken,
+  });
+}
+
+export function requestPasswordReset(payload: PasswordResetRequestBody): Promise<SuccessResponse> {
+  return request<SuccessResponse>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmPasswordReset(payload: PasswordResetConfirmBody): Promise<SuccessResponse> {
+  return request<SuccessResponse>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
 

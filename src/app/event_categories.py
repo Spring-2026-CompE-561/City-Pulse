@@ -17,6 +17,9 @@ LEGACY_CATEGORY_ALIASES: dict[str, str] = {
     "Business": "Entertainment",
     "Health & Wellness": "Arts & Culture",
     "Nightlife": "Nightlife (Bars & Clubs)",
+    "Nightlife (Bars & Clubs)": "Nightlife (Bars & Clubs)",
+    "nightlife": "Nightlife (Bars & Clubs)",
+    "nightlife (bars & clubs)": "Nightlife (Bars & Clubs)",
     "Charity & Causes": "Arts & Culture",
     "Community": "Entertainment",
 }

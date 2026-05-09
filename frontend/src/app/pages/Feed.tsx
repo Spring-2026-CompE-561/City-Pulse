@@ -116,7 +116,7 @@ export function Feed() {
     return () => {
       isMounted = false;
     };
-  }, [router, refreshToken, selectedCategory, selectedNeighborhood, startDate]);
+  }, [router, refreshToken, selectedCategory, startDate]);
 
   const handleLogout = () => {
     clearSession();
@@ -149,7 +149,7 @@ export function Feed() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedNeighborhood, startDate]);
+  }, [searchQuery, selectedCategory, startDate]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -277,7 +277,6 @@ export function Feed() {
                   size="sm"
                   onClick={() => {
                     setSelectedCategory('All Categories');
-                    setSelectedNeighborhood('All Neighborhoods');
                     setStartDate('');
                     setCurrentPage(1);
                     setRefreshToken((value) => value + 1);
@@ -289,7 +288,7 @@ export function Feed() {
             </div>
 
             {showFilters && (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">City</label>
                   <Select value={selectedCity} disabled>
@@ -348,6 +347,7 @@ export function Feed() {
                     type="date"
                     value={startDate}
                     onChange={(event) => setStartDate(event.target.value)}
+                    className="event-date-filter-input"
                   />
                 </div>
               </div>

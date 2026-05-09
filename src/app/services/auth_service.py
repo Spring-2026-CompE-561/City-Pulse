@@ -1,9 +1,17 @@
+import hashlib
+import hmac
+import secrets
+from urllib.parse import urlencode
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.auth import (
+    create_password_reset_token,
     create_access_token,
     create_refresh_token,
+    decode_password_reset_token,
     hash_password,
     verify_password,
 )
@@ -15,6 +23,13 @@ from app.repository.user import (
     get_user_by_email,
 )
 from app.schemas import LoginRequest, UserCreate
+from app.services.email_service import send_password_reset_email
+
+
+def _build_reset_code_signature(email: str, access_code: str) -> str:
+    data = f"{email}:{access_code}".encode()
+    secret = settings.jwt_secret_key or ""
+    return hmac.new(secret.encode(), data, hashlib.sha256).hexdigest()
 
 
 def is_duplicate_email_error(exc: IntegrityError) -> bool:
@@ -70,6 +85,69 @@ async def login_user(db: AsyncSession, payload: LoginRequest) -> dict | None:
     if not user or not verify_password(payload.password, user.password_hash):
         return None
     return build_token_pair(require_user_id(user))
+
+
+async def send_password_reset_instructions(db: AsyncSession, *, email: str) -> None:
+    """
+    Send password reset instructions (link + access code) if the account exists.
+
+    This endpoint must be non-enumerating, so callers should always return
+    a generic success message regardless of whether a user was found.
+    """
+    normalized_email = email.strip().lower()
+    if not normalized_email:
+        return
+    user = await get_user_by_email(db, normalized_email)
+    if user is None:
+        return
+
+    access_code = f"{secrets.randbelow(1_000_000):06d}"
+    access_code_signature = _build_reset_code_signature(normalized_email, access_code)
+    reset_token = create_password_reset_token(normalized_email, access_code_signature)
+
+    query = urlencode(
+        {
+            "auth": "reset",
+            "reset_token": reset_token,
+            "reset_email": normalized_email,
+        }
+    )
+    frontend_base_url = settings.frontend_base_url.rstrip("/")
+    reset_link = f"{frontend_base_url}/?{query}"
+
+    send_password_reset_email(
+        recipient_email=normalized_email,
+        reset_link=reset_link,
+        access_code=access_code,
+    )
+
+
+async def reset_password_with_token(
+    db: AsyncSession,
+    *,
+    token: str,
+    access_code: str,
+    new_password: str,
+) -> bool:
+    """
+    Validate reset token + access code and update password hash.
+
+    Returns False on invalid token/code/user and True when the password is updated.
+    """
+    payload = decode_password_reset_token(token)
+    if payload is None:
+        return False
+    email = payload["sub"]
+    expected_signature = payload["code_signature"]
+    provided_signature = _build_reset_code_signature(email, access_code.strip())
+    if not hmac.compare_digest(provided_signature, expected_signature):
+        return False
+    user = await get_user_by_email(db, email)
+    if user is None:
+        return False
+    user.password_hash = hash_password(new_password)
+    await db.flush()
+    return True
 
 
 def user_to_public(user: User) -> dict:

@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     ingest_scheduler_enabled: bool = False
     ingest_scheduler_interval_minutes: int = 60
     skip_db_init: bool = False
+    # Password reset + transactional email settings.
+    password_reset_expire_minutes: int = 30
+    frontend_base_url: str = "http://localhost:3000"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_use_tls: bool = True
 
     @model_validator(mode="after")
     def set_database_url(self) -> "Settings":

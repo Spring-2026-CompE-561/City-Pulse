@@ -133,7 +133,7 @@ DEFAULT_COMMUNITY_SOURCES: tuple[dict[str, str | bool | int | None], ...] = (
         "domain": "whistlestopbar.com",
         "base_url": "https://whistlestopbar.com/",
         "source_type": "html",
-        "category_hint": "Music",
+        "category_hint": "Nightlife (Bars & Clubs)",
         "neighborhood": "South Park",
         "crawl_allowed": True,
         "crawl_delay_seconds": 12,

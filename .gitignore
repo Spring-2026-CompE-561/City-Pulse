@@ -11,7 +11,8 @@ __pycache__/
 *.db-*
 *.sqlite
 *.sqlite3
-
+*.sql
+docker/mysql/init/*.sql
 # Database files and dumps
 *.db
 *.sqlite
@@ -38,3 +39,6 @@ playwright-report/
 test-results/
 nohup.out
 uvicorn.log
+docker/mysql/init/01-city-pulse-seed.sql
+docker/mysql/init/01-city-pulse-seed.sql
+/docker
