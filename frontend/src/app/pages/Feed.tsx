@@ -33,6 +33,19 @@ export function Feed() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
+
+  function event_is_active(event: FeedEvent, nowMs: number): boolean {
+    if (!event.event_start_at) {
+      return true;
+    }
+    const referenceIso = event.event_end_at ?? event.event_start_at;
+    const referenceMs = Date.parse(referenceIso);
+    if (Number.isNaN(referenceMs)) {
+      return true;
+    }
+    return referenceMs >= nowMs;
+  }
 
   function startsAfterIsoFromDateInput(value: string): string | undefined {
     if (!value.trim()) {
@@ -119,6 +132,15 @@ export function Feed() {
     };
   }, [router, refreshToken, selectedCategory, startDate]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, 60_000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const handleLogout = () => {
     clearSession();
     toast.success("Logged out successfully");
@@ -131,7 +153,8 @@ export function Feed() {
       (event.content ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCity =
       selectedCity === "San Diego, CA" || event.city === selectedCity;
-    return matchesSearch && matchesCity;
+    const isActive = event_is_active(event, currentTimeMs);
+    return matchesSearch && matchesCity && isActive;
   });
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
   const pageStartIndex = (currentPage - 1) * EVENTS_PER_PAGE;

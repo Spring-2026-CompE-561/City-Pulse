@@ -19,6 +19,7 @@ async def list_events_by_region(
     neighborhood: str | None = None,
     starts_after: datetime | None = None,
     starts_before: datetime | None = None,
+    active_after: datetime | None = None,
 ) -> list[Event]:
     query = select(Event).where(col(Event.region_id) == region_id).options(joinedload(Event.user))
     if category is not None:
@@ -32,6 +33,11 @@ async def list_events_by_region(
     if starts_before is not None:
         query = query.where(
             (col(Event.event_start_at).is_(None)) | (col(Event.event_start_at) <= starts_before)
+        )
+    if active_after is not None:
+        query = query.where(
+            (col(Event.event_start_at).is_(None))
+            | (func.coalesce(col(Event.event_end_at), col(Event.event_start_at)) >= active_after)
         )
     query = query.order_by(col(Event.event_start_at), col(Event.created_at).desc())
     result = await db.execute(query.offset(skip).limit(limit))
@@ -227,6 +233,29 @@ async def remove_duplicate_source_events(db: AsyncSession, *, region_id: int) ->
 
     await db.execute(delete(Trend).where(col(Trend.event_id).in_(duplicate_ids)))
     deletion = await db.execute(delete(Event).where(col(Event.id).in_(duplicate_ids)))
+    await db.flush()
+    return int(deletion.rowcount or 0)
+
+
+async def delete_past_events_older_than(
+    db: AsyncSession,
+    *,
+    region_id: int,
+    retention_cutoff: datetime,
+) -> int:
+    """Delete ended events older than the retention cutoff."""
+    matching_ids_result = await db.execute(
+        select(col(Event.id)).where(
+            col(Event.region_id) == region_id,
+            col(Event.event_start_at).is_not(None),
+            func.coalesce(col(Event.event_end_at), col(Event.event_start_at)) < retention_cutoff,
+        )
+    )
+    matching_ids = [event_id for event_id in matching_ids_result.scalars().all() if event_id is not None]
+    if not matching_ids:
+        return 0
+    await db.execute(delete(Trend).where(col(Trend.event_id).in_(matching_ids)))
+    deletion = await db.execute(delete(Event).where(col(Event.id).in_(matching_ids)))
     await db.flush()
     return int(deletion.rowcount or 0)
 

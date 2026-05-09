@@ -120,3 +120,86 @@ def test_delete_comment_forbidden_for_non_owner(monkeypatch):
     app.dependency_overrides.clear()
 
     assert response.status_code == 403
+
+
+def test_list_interactions_filters_with_current_time_and_cleanup(monkeypatch):
+    called = {"cleanup": False, "active_after_seen": False}
+
+    async def _fake_list_events_by_region(
+        _db,
+        *,
+        region_id,
+        skip,
+        limit,
+        category=None,
+        neighborhood=None,
+        starts_after=None,
+        starts_before=None,
+        active_after=None,
+    ):
+        assert region_id == 0
+        assert skip == 0
+        assert limit == 50
+        assert category is None
+        assert neighborhood is None
+        assert starts_after is None
+        assert starts_before is None
+        assert active_after is not None
+        assert active_after.tzinfo is not None
+        called["active_after_seen"] = True
+        return [
+            Event(
+                id=10,
+                region_id=0,
+                user_id=1,
+                title="Picnic",
+                category="Food & Drink",
+                content="Sunday",
+                created_at=datetime.now(UTC),
+            )
+        ]
+
+    async def _fake_delete_past_events(_db, *, region_id, retention_cutoff):
+        assert region_id == 0
+        assert retention_cutoff.tzinfo is not None
+        called["cleanup"] = True
+        return 0
+
+    async def _fake_get_counts(_db, *, event_id):
+        assert event_id == 10
+        return 0, 0, 0
+
+    async def _fake_list_comments(_db, *, event_id):
+        assert event_id == 10
+        return []
+
+    monkeypatch.setattr(
+        interactions_router_module,
+        "list_events_by_region",
+        _fake_list_events_by_region,
+    )
+    monkeypatch.setattr(
+        interactions_router_module,
+        "delete_past_events_older_than",
+        _fake_delete_past_events,
+    )
+    monkeypatch.setattr(
+        interactions_router_module,
+        "get_event_interaction_counts",
+        _fake_get_counts,
+    )
+    monkeypatch.setattr(
+        interactions_router_module,
+        "list_comments_for_event",
+        _fake_list_comments,
+    )
+    client = _build_client(monkeypatch)
+    response = client.get("/api/interactions/")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["id"] == 10
+    assert called["cleanup"] is True
+    assert called["active_after_seen"] is True

@@ -1,8 +1,9 @@
 """Event API: list events (default region san diego), create, update, delete."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 import json
 from pathlib import Path as FilePath
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, File, Path, Query, UploadFile
@@ -24,6 +25,7 @@ from app.repository.event import (
     create_event as create_event_row,
 )
 from app.repository.event import (
+    delete_past_events_older_than,
     delete_event as delete_event_row,
 )
 from app.repository.event import (
@@ -48,6 +50,22 @@ ALLOWED_EVENT_MEDIA_TYPES = {
     "application/pdf": ".pdf",
 }
 MAX_EVENT_MEDIA_BYTES = 10 * 1024 * 1024
+PAST_EVENT_RETENTION_DAYS = 7
+
+
+def resolve_feed_timezone() -> tzinfo:
+    try:
+        return ZoneInfo("America/Los_Angeles")
+    except ZoneInfoNotFoundError:
+        return UTC
+
+
+FEED_TIMEZONE = resolve_feed_timezone()
+
+
+def current_feed_time() -> datetime:
+    """Return current local feed time used for active event filtering."""
+    return datetime.now(FEED_TIMEZONE)
 
 
 @router.get("", response_model=list[EventRead], include_in_schema=False)
@@ -71,6 +89,13 @@ async def list_events(
         category_filter = parse_event_category_filter(category)
     except ValueError as e:
         raise bad_request(str(e)) from e
+    now_local = current_feed_time()
+    retention_cutoff = now_local - timedelta(days=PAST_EVENT_RETENTION_DAYS)
+    await delete_past_events_older_than(
+        db,
+        region_id=region_id,
+        retention_cutoff=retention_cutoff,
+    )
     return await list_events_by_region(
         db,
         region_id=region_id,
@@ -78,6 +103,7 @@ async def list_events(
         neighborhood=neighborhood,
         starts_after=starts_after,
         starts_before=starts_before,
+        active_after=now_local,
         skip=skip,
         limit=limit,
     )
