@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
-const backend_api_origin = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+// Proxy target must be absolute. NEXT_PUBLIC_API_BASE_URL is often `/api` and must not be used here.
+const backend_api_origin =
+  process.env.BACKEND_API_ORIGIN ?? 'http://127.0.0.1:8000';
 
 const next_config: NextConfig = {
   reactStrictMode: true,

@@ -18,7 +18,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.event_categories import ALL_CATEGORIES_OPTION
+from app.event_categories import ALL_CATEGORIES_OPTION, ALLOWED_EVENT_CATEGORIES
 
 
 # ----- User -----
@@ -86,6 +86,20 @@ class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1, description="Refresh token received from register or login.")
 
 
+class PasswordResetRequest(BaseModel):
+    """Body for POST /api/auth/forgot-password to send a reset email."""
+
+    email: str = Field(..., min_length=1, max_length=255, description="Registered account email.")
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Body for POST /api/auth/reset-password to confirm a password reset."""
+
+    token: str = Field(..., min_length=1, description="Password reset token from email link.")
+    access_code: str = Field(..., min_length=1, max_length=32, description="One-time access code from email.")
+    new_password: str = Field(..., min_length=1, description="New password to store for the account.")
+
+
 # ----- Region -----
 class RegionRead(BaseModel):
     """Region: id and name (filing cabinet for events/users)."""
@@ -104,19 +118,7 @@ class EventCreate(BaseModel):
     # Author user id; router validates that user exists and is in San Diego.
     user_id: int = Field(..., description="User posting the event (must have city_location = san diego).")
     title: str = Field(..., min_length=1, max_length=512)
-    category: Literal[
-        "Technology",
-        "Arts & Culture",
-        "Environment",
-        "Entertainment",
-        "Business",
-        "Food & Drink",
-        "Health & Wellness",
-        "Music",
-        "Nightlife",
-        "Charity & Causes",
-        "Community",
-    ] = Field(..., description="Category selected from the frontend dropdown options.")
+    category: str = Field(..., description="Category selected from the frontend dropdown options.")
     content: str | None = Field(None, max_length=10000)
     event_start_at: datetime | None = None
     event_end_at: datetime | None = None
@@ -134,19 +136,7 @@ class EventUpdate(BaseModel):
 
     # Partial update fields; router only updates provided values.
     title: str | None = Field(None, min_length=1, max_length=512)
-    category: Literal[
-        "Technology",
-        "Arts & Culture",
-        "Environment",
-        "Entertainment",
-        "Business",
-        "Food & Drink",
-        "Health & Wellness",
-        "Music",
-        "Nightlife",
-        "Charity & Causes",
-        "Community",
-    ] | None = Field(None, description="Updated category from the frontend dropdown options.")
+    category: str | None = Field(None, description="Updated category from the frontend dropdown options.")
     content: str | None = None
     event_start_at: datetime | None = None
     event_end_at: datetime | None = None
@@ -198,20 +188,7 @@ class EventCategoryOptionsResponse(BaseModel):
     """Allowed category values for frontend dropdown menus."""
 
     options: list[str] = Field(
-        default_factory=lambda: [
-            ALL_CATEGORIES_OPTION,
-            "Technology",
-            "Arts & Culture",
-            "Environment",
-            "Entertainment",
-            "Business",
-            "Food & Drink",
-            "Health & Wellness",
-            "Music",
-            "Nightlife",
-            "Charity & Causes",
-            "Community",
-        ]
+        default_factory=lambda: [ALL_CATEGORIES_OPTION, *ALLOWED_EVENT_CATEGORIES]
     )
 
 
@@ -389,19 +366,7 @@ class PartnerSubmissionCreate(BaseModel):
     external_event_url: str | None = Field(None, max_length=2048)
     title: str = Field(..., min_length=1, max_length=512)
     description: str | None = None
-    category: Literal[
-        "Technology",
-        "Arts & Culture",
-        "Environment",
-        "Entertainment",
-        "Business",
-        "Food & Drink",
-        "Health & Wellness",
-        "Music",
-        "Nightlife",
-        "Charity & Causes",
-        "Community",
-    ] = "Arts & Culture"
+    category: str = "Arts & Culture"
     neighborhood: str | None = Field(None, max_length=100)
     venue_name: str | None = Field(None, max_length=255)
     venue_address: str | None = Field(None, max_length=512)

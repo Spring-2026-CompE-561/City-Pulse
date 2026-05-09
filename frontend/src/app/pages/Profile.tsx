@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -8,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { getMe, isAuthError, listEventsWithInteractions } from '../lib/api';
 import type { EventWithInteractionsRead, UserRead } from '../lib/contracts';
 import { CATEGORY_IMAGES } from '../lib/constants';
+import { parse_api_datetime } from '../lib/datetime';
 import { clearSession, getCurrentUser, getProfileOverride, getStorageData, setCurrentUser } from '../lib/storage';
 import { ArrowLeft, Calendar, MapPin, TrendingUp, Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -82,7 +84,7 @@ export function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Loading your profile...</p>
       </div>
     );
@@ -95,15 +97,27 @@ export function Profile() {
   const attendingEvents = events.filter((event) => attendingEventIds.includes(event.id));
   const organizedEvents = events.filter((event) => event.user_id === user.id);
   const commentsCount = events.reduce((acc, event) => acc + event.comments_count, 0);
+  const likesCount = organizedEvents.reduce((acc, event) => acc + (event.likes_count ?? 0), 0);
+  const formatEventDate = (value: string): string => {
+    const parsed = parse_api_datetime(value);
+    if (!parsed) {
+      return 'Date unavailable';
+    }
+    return parsed.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-background">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Feed
           </Button>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -130,7 +144,7 @@ export function Profile() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t">
+            <div className="grid grid-cols-4 gap-4 mt-8 pt-8 border-t">
               <div className="text-center">
                 <div className="text-2xl font-bold" style={{ color: '#FF6B35' }}>{attendingEvents.length}</div>
                 <div className="text-sm text-muted-foreground">Attending</div>
@@ -142,6 +156,10 @@ export function Profile() {
               <div className="text-center">
                 <div className="text-2xl font-bold" style={{ color: '#E63946' }}>{commentsCount}</div>
                 <div className="text-sm text-muted-foreground">Comments</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold" style={{ color: '#E63946' }}>{likesCount}</div>
+                <div className="text-sm text-muted-foreground">Likes</div>
               </div>
             </div>
           </CardContent>
@@ -180,10 +198,7 @@ export function Profile() {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                         <Calendar className="w-4 h-4" />
                         <span>
-                          {new Date(event.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {formatEventDate(event.created_at)}
                         </span>
                       </div>
                     </CardHeader>
@@ -219,10 +234,7 @@ export function Profile() {
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />
                             <span>
-                              {new Date(event.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                              })}
+                              {formatEventDate(event.created_at)}
                             </span>
                           </div>
                           <Badge variant="secondary" className="text-xs">

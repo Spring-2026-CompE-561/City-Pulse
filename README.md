@@ -110,6 +110,94 @@ City-Pulse/
 
 ---
 
+## Docker (shared team environment)
+
+This repo now includes:
+
+- `docker-compose.yml` (`db` + `backend` + `frontend`)
+- `Dockerfile.backend`
+- `frontend/Dockerfile`
+- `docker/mysql/init/` for one-time DB seed SQL
+
+Use this when you want teammates to use one shared running environment with the same data.
+
+### 1) Create a Docker env file
+
+Create `.env.docker` in the repo root:
+
+```bash
+MYSQL_ROOT_PASSWORD=replace-root-password
+MYSQL_DATABASE=city_pulse
+MYSQL_USER=city_pulse
+MYSQL_PASSWORD=replace-app-password
+MYSQL_HOST_PORT=3307
+JWT_SECRET_KEY=replace-with-32-byte-secret
+INGEST_API_KEY=replace-with-ingest-key
+NEXT_PUBLIC_API_BASE_URL=/api
+DEBUG=false
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_DAYS=7
+JWT_ALGORITHM=HS256
+CORS_ALLOW_ORIGINS=*
+INGEST_SCHEDULER_ENABLED=false
+INGEST_SCHEDULER_INTERVAL_MINUTES=60
+```
+
+### 2) Export your current local MySQL data (one-time seed)
+
+If your local DB already has the state you want teammates to use:
+
+```bash
+mysqldump --no-tablespaces -h 127.0.0.1 -P 3306 -u city_pulse -p --databases city_pulse --result-file=docker/mysql/init/01-city-pulse-seed.sql
+```
+
+Notes:
+
+- Use `--result-file` (instead of PowerShell `>` redirection). PowerShell redirection can produce UTF-16 output that MySQL init cannot parse.
+- Seed scripts run only when the `mysql_data` volume is empty.
+- To re-seed from scratch later:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+Optional quick verification before reseed:
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -u city_pulse -p -D city_pulse -e "SELECT COUNT(*) AS users_count FROM users; SELECT COUNT(*) AS events_count FROM events;"
+```
+
+### 3) Start the stack
+
+```bash
+docker compose --env-file .env.docker up --build -d
+```
+
+Optional verification after startup:
+
+```bash
+docker compose --env-file .env.docker exec -T db mysql -u city_pulse -p<password> -D city_pulse -e "SELECT COUNT(*) AS users_count FROM users; SELECT COUNT(*) AS events_count FROM events;"
+```
+
+Endpoints:
+
+- Frontend: `http://localhost:3000`
+- Backend docs: `http://localhost:8000/docs`
+- MySQL host access (optional): `localhost:${MYSQL_HOST_PORT}` (default `3307`)
+
+For Docker, keep `NEXT_PUBLIC_API_BASE_URL=/api` so the browser always calls the frontend origin and Next.js rewrites proxy to backend internally.
+
+### 4) Let teammates access simultaneously
+
+Run the stack on one machine (your machine or a VM), then share that machine's reachable address:
+
+- Same LAN: `http://<host-lan-ip>:3000`
+- Internet: expose port `3000` through your cloud/edge tunnel (for example Cloudflare Tunnel, Tailscale Funnel, or reverse proxy)
+
+All teammates will hit the same frontend and backend instance, and therefore the same MySQL data.
+
+---
+
 ## Optional: pip workflow (alternative to uv)
 
 ```bash

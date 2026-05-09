@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -158,13 +159,14 @@ export function ProfileSettings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-background">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/profile')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Profile
           </Button>
+          <ThemeToggle />
         </div>
       </header>
 

@@ -185,8 +185,8 @@ export const mockEvents: Event[] = [
     id: '9',
     title: 'Jazz Night at Blue Note',
     description: 'An intimate evening of live jazz featuring Grammy-nominated artists. Classic cocktails and sophisticated ambiance make this a perfect night out.',
-    category: 'Music',
-    location: 'Blue Note Jazz Club',
+    category: 'Nightlife (Bars & Clubs)',
+    location: 'Blue Note Jazz Bar',
     city: 'New York, NY',
     date: '2026-04-14',
     time: '8:00 PM - 11:00 PM',
@@ -225,12 +225,9 @@ export const cities = [
 
 export const categories = [
   'All Categories',
-  'Technology',
-  'Arts & Culture',
-  'Environment',
-  'Entertainment',
-  'Business',
-  'Food & Drink',
-  'Health & Wellness',
   'Music',
+  'Arts & Culture',
+  'Food & Drink',
+  'Entertainment',
+  'Nightlife (Bars & Clubs)',
 ];

@@ -49,12 +49,13 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
+  --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /* Keep brand orange for primary actions in dark mode */
+  --primary: #FF6B35;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -65,6 +66,8 @@
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
+  --input-background: oklch(0.22 0 0);
+  --switch-background: oklch(0.35 0 0);
   --ring: oklch(0.439 0 0);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -183,4 +186,15 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+}
+
+.event-date-filter-input[type="date"] {
+  position: relative;
+  text-align: left;
+}
+
+.event-date-filter-input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.35rem;
+  margin: 0;
 }

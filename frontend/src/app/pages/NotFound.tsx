@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Home, Search } from 'lucide-react';
 
@@ -6,7 +7,10 @@ export function NotFound() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+    <div className="relative min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center text-foreground">
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="text-center space-y-6 px-4">
         <div className="space-y-2">
           <h1 className="text-9xl font-bold text-blue-600">404</h1>

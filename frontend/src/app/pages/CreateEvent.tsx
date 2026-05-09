@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -8,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { createEvent, isAuthError, listCategories, uploadEventImage } from '../lib/api';
 import type { UserRead } from '../lib/contracts';
+import { normalizeEventCategory } from '../lib/constants';
 import { clearSession, getCurrentUser, getAccessToken } from '../lib/storage';
+import { validate_post_quality } from '../lib/validation';
 import { ArrowLeft, Calendar, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,21 +22,17 @@ export function CreateEvent() {
   const [user, setUser] = useState<UserRead | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([
-    'Technology',
-    'Arts & Culture',
-    'Environment',
-    'Entertainment',
-    'Business',
-    'Food & Drink',
-    'Health & Wellness',
     'Music',
+    'Arts & Culture',
+    'Food & Drink',
+    'Entertainment',
+    'Nightlife (Bars & Clubs)',
   ]);
   const [formData, setFormData] = useState({
     title: '',
     organizerName: '',
     description: '',
     category: '',
-    neighborhood: '',
     venueName: '',
     venueAddress: '',
     priceInfo: '',
@@ -71,6 +70,16 @@ export function CreateEvent() {
       toast.error('Please fill in all required fields');
       return;
     }
+    const titleQualityError = validate_post_quality(formData.title, { minLength: 6, minWords: 2 });
+    if (titleQualityError) {
+      toast.error(`Title issue: ${titleQualityError}`);
+      return;
+    }
+    const descriptionQualityError = validate_post_quality(formData.description, { minLength: 20, minWords: 4 });
+    if (descriptionQualityError) {
+      toast.error(`Description issue: ${descriptionQualityError}`);
+      return;
+    }
     if (formData.description.length > MAX_DESCRIPTION_LENGTH) {
       toast.error('MAX description limit reached');
       return;
@@ -91,9 +100,8 @@ export function CreateEvent() {
         user_id: user.id,
         title: formData.title,
         organizer_name: formData.organizerName.trim() || undefined,
-        category: formData.category,
+        category: normalizeEventCategory(formData.category, formData.venueName),
         content: formData.description,
-        neighborhood: formData.neighborhood || undefined,
         venue_name: formData.venueName || undefined,
         venue_address: formData.venueAddress || undefined,
         price_info: formData.priceInfo || undefined,
@@ -158,7 +166,7 @@ export function CreateEvent() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Checking your session...</p>
       </div>
     );
@@ -169,15 +177,16 @@ export function CreateEvent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-4">
             <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Feed
             </Button>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -262,15 +271,6 @@ export function CreateEvent() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="neighborhood">Neighborhood</Label>
-                  <Input
-                    id="neighborhood"
-                    placeholder="e.g., North Park"
-                    value={formData.neighborhood}
-                    onChange={(e) => handleChange('neighborhood', e.target.value)}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="venueName">Venue</Label>
                   <Input

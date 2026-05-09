@@ -111,7 +111,7 @@ async def init_db() -> None:
             await conn.execute(
                 text(
                     "ALTER TABLE events "
-                    "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Technology'"
+                    "ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'Entertainment'"
                 )
             )
         event_image_column = await conn.execute(
@@ -147,6 +147,7 @@ async def init_db() -> None:
                 {"id": REGION_SAN_DIEGO_ID, "name": "San Diego"},
             )
         await _run_sql_migrations(conn)
+        await _normalize_event_categories(conn)
 
     async with async_session_maker() as session:
         await _seed_default_sources(session)
@@ -185,6 +186,57 @@ async def _run_sql_migrations(conn) -> None:
             text("INSERT INTO schema_migrations (id) VALUES (:id)"),
             {"id": migration_id},
         )
+
+
+async def _normalize_event_categories(conn: AsyncConnection) -> None:
+    await conn.execute(
+        text(
+            "UPDATE events SET category = CASE "
+            "WHEN LOWER(category) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN source_id IN ("
+            "SELECT id FROM sources "
+            "WHERE LOWER(COALESCE(category_hint, '')) IN ('nightlife', 'nightlife (bars & clubs)')"
+            ") THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN source_id IN ("
+            "SELECT id FROM sources "
+            "WHERE LOWER(COALESCE(domain, '')) = 'whistlestopbar.com' "
+            "OR LOWER(COALESCE(name, '')) = 'whistle stop events'"
+            ") THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(venue_name, '')) LIKE '%whistle stop%' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(canonical_url, '')) LIKE '%whistlestopbar.com%' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(venue_name, '')) LIKE '%bar%' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN category = 'Music' THEN 'Music' "
+            "WHEN category = 'Arts & Culture' THEN 'Arts & Culture' "
+            "WHEN category = 'Food & Drink' THEN 'Food & Drink' "
+            "WHEN category = 'Entertainment' THEN 'Entertainment' "
+            "ELSE 'Entertainment' END"
+        )
+    )
+    await conn.execute(
+        text(
+            "UPDATE partner_submissions SET category = CASE "
+            "WHEN LOWER(category) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN category = 'Music' THEN 'Music' "
+            "WHEN category = 'Arts & Culture' THEN 'Arts & Culture' "
+            "WHEN category = 'Food & Drink' THEN 'Food & Drink' "
+            "WHEN category = 'Entertainment' THEN 'Entertainment' "
+            "ELSE 'Entertainment' END"
+        )
+    )
+    await conn.execute(
+        text(
+            "UPDATE sources SET category_hint = CASE "
+            "WHEN LOWER(COALESCE(domain, '')) = 'whistlestopbar.com' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(COALESCE(name, '')) = 'whistle stop events' THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN LOWER(category_hint) IN ('nightlife', 'nightlife (bars & clubs)') THEN 'Nightlife (Bars & Clubs)' "
+            "WHEN category_hint = 'Music' THEN 'Music' "
+            "WHEN category_hint = 'Arts & Culture' THEN 'Arts & Culture' "
+            "WHEN category_hint = 'Food & Drink' THEN 'Food & Drink' "
+            "WHEN category_hint = 'Entertainment' THEN 'Entertainment' "
+            "WHEN category_hint IS NULL OR category_hint = '' THEN 'Entertainment' "
+            "ELSE 'Entertainment' END"
+        )
+    )
 
 
 async def _execute_migration_statement(conn: AsyncConnection, statement: str) -> None:
