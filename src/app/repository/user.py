@@ -39,8 +39,10 @@ async def create_user(
 
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     """Return a single user by email, or None."""
-    result = await db.execute(select(User).where(col(User.email) == email))
-    return result.scalar_one_or_none()
+    result = await db.execute(
+        select(User).where(col(User.email) == email).limit(1)
+    )
+    return result.scalars().first()
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:

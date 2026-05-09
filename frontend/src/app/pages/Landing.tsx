@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Button } from "../components/ui/button";
 import { AuthModal } from "../components/AuthModal";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { getMe, isAuthError } from "../lib/api";
 import { clearSession, hasValidSession } from "../lib/storage";
 import { MapPin, TrendingUp, Users, Calendar } from "lucide-react";
@@ -63,9 +64,9 @@ export function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-20 shadow-sm">
+      <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -87,7 +88,10 @@ export function Landing() {
                 CityPulse
               </span>
             </div>
-            <Button onClick={() => setShowAuth(true)}>Sign In</Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button onClick={() => setShowAuth(true)}>Sign In</Button>
+            </div>
           </div>
         </div>
       </nav>
@@ -111,7 +115,7 @@ export function Landing() {
                 />
               </div>
             ))}
-            <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/80 to-white/90" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/80 to-white/90 dark:from-slate-950/70 dark:via-slate-900/85 dark:to-slate-950/95" />
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight relative z-10">
@@ -147,7 +151,7 @@ export function Landing() {
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-12 md:mt-24 max-w-5xl mx-auto">
-          <div className="bg-white rounded-lg p-8 shadow-sm border">
+          <div className="bg-card rounded-lg p-8 shadow-sm border border-border">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
               style={{ backgroundColor: "rgba(255, 107, 53, 0.1)" }}
@@ -163,7 +167,7 @@ export function Landing() {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-8 shadow-sm border">
+          <div className="bg-card rounded-lg p-8 shadow-sm border border-border">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
               style={{ backgroundColor: "rgba(0, 78, 137, 0.1)" }}
@@ -176,7 +180,7 @@ export function Landing() {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-8 shadow-sm border">
+          <div className="bg-card rounded-lg p-8 shadow-sm border border-border">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
               style={{ backgroundColor: "rgba(230, 57, 70, 0.1)" }}
@@ -192,7 +196,7 @@ export function Landing() {
         </div>
 
         {/* Stats Section */}
-        <div className="mt-12 md:mt-24 bg-white rounded-2xl p-6 md:p-12 shadow-sm border max-w-5xl mx-auto">
+        <div className="mt-12 md:mt-24 bg-card rounded-2xl p-6 md:p-12 shadow-sm border border-border max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div>
               <div

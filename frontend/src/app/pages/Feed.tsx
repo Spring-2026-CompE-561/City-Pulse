@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { EventCard } from '../components/EventCard';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -159,7 +160,7 @@ export function Feed() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Loading your feed...</p>
       </div>
     );
@@ -171,7 +172,7 @@ export function Feed() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <div className="text-center space-y-4">
           <p className="text-muted-foreground">{loadError}</p>
           <Button onClick={() => setRefreshToken((value) => value + 1)}>
@@ -183,9 +184,9 @@ export function Feed() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link href="/feed" className="flex items-center gap-3">
@@ -208,7 +209,8 @@ export function Feed() {
               </span>
             </Link>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="gap-2">
                   <Avatar className="w-8 h-8">
@@ -247,7 +249,7 @@ export function Feed() {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg p-6 mb-8 shadow-sm border">
+        <div className="bg-card rounded-lg p-6 mb-8 shadow-sm border border-border">
           <div className="flex flex-col gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
@@ -385,7 +387,7 @@ export function Feed() {
           </div>
 
           {filteredEvents.length === 0 ? (
-            <div className="bg-white rounded-lg p-12 text-center shadow-sm border">
+            <div className="bg-card rounded-lg p-12 text-center shadow-sm border border-border">
               <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">No events found</h3>
               <p className="text-muted-foreground mb-4">

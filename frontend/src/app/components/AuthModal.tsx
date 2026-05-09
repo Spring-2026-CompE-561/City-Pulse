@@ -320,10 +320,6 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
             </form>
 
             <form onSubmit={handlePasswordReset} className="space-y-3 border rounded-md p-4">
-          </TabsContent>
-
-          <TabsContent value="signup">
-            <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-token">Reset Token (from link)</Label>
                 <Input
@@ -368,12 +364,8 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                   required
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Sign up creates your account in the backend with city location
-                set to San Diego.
-              </p>
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                Create Account
+              <Button type="submit" className="w-full" disabled={isResettingPassword}>
+                Set new password
               </Button>
             </form>
           </div>

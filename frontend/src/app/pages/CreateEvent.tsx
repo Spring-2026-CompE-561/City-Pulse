@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -165,7 +166,7 @@ export function CreateEvent() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Checking your session...</p>
       </div>
     );
@@ -176,15 +177,16 @@ export function CreateEvent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-4">
             <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Feed
             </Button>
+            <ThemeToggle />
           </div>
         </div>
       </header>

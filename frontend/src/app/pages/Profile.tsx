@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -83,7 +84,7 @@ export function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="min-h-screen bg-background grid place-items-center">
         <p className="text-muted-foreground">Loading your profile...</p>
       </div>
     );
@@ -109,13 +110,14 @@ export function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-background">
+      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/feed')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Feed
           </Button>
+          <ThemeToggle />
         </div>
       </header>
 
