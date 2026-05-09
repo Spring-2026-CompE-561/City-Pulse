@@ -29,6 +29,8 @@ docker/mysql/init/*.sql
 ADDITIONAL_CONSIDERATIONS.txt
 API_PARAMETERS.txt
 mySQL-authentication.txt
+frontend/node_modules/
+frontend/.next/
 node_modules/
 .next/
 dist/

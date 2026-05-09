@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { AuthModal } from "../components/AuthModal";
-import { getMe, isAuthError } from "../lib/api";
-import { clearSession, hasValidSession } from "../lib/storage";
+import { getCurrentUser } from "../lib/storage";
 import { MapPin, TrendingUp, Users, Calendar } from "lucide-react";
 import logoImage from "../../imports/CityPulse_Logo.png";
 
@@ -18,36 +17,15 @@ const heroImages = [
 export function Landing() {
   const [showAuth, setShowAuth] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    let isMounted = true;
-    const bootstrapSession = async () => {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('auth') === 'reset') {
-          setShowAuth(true);
-        }
-      }
-      if (!hasValidSession()) {
-        return;
-      }
-      try {
-        await getMe();
-        if (isMounted) {
-          router.push("/feed");
-        }
-      } catch (error) {
-        if (isAuthError(error)) {
-          clearSession();
-        }
-      }
-    };
-    bootstrapSession();
-    return () => {
-      isMounted = false;
-    };
-  }, [router]);
+    // If user is already logged in, redirect to feed
+    const user = getCurrentUser();
+    if (user) {
+      navigate("/feed");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     // Slideshow interval
@@ -59,21 +37,17 @@ export function Landing() {
   }, []);
 
   const handleAuthSuccess = () => {
-    router.push("/feed");
+    navigate("/feed");
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-20 shadow-sm">
+      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img
-                src={logoImage.src}
-                alt="CityPulse Logo"
-                className="w-10 h-10"
-              />
+              <img src={logoImage} alt="CityPulse Logo" className="w-10 h-10" />
               <span
                 className="text-2xl font-bold"
                 style={{
@@ -114,7 +88,7 @@ export function Landing() {
             <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/80 to-white/90" />
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight relative z-10">
+          <h1 className="text-5xl md:text-6xl font-bold leading-tight relative z-10">
             Discover What's Happening{" "}
             <span
               style={{
@@ -146,7 +120,7 @@ export function Landing() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-12 md:mt-24 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-16 md:mt-24 max-w-5xl mx-auto">
           <div className="bg-white rounded-lg p-8 shadow-sm border">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center mb-4"
@@ -192,7 +166,7 @@ export function Landing() {
         </div>
 
         {/* Stats Section */}
-        <div className="mt-12 md:mt-24 bg-white rounded-2xl p-6 md:p-12 shadow-sm border max-w-5xl mx-auto">
+        <div className="mt-24 bg-white rounded-2xl p-12 shadow-sm border max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div>
               <div

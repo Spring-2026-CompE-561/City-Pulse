@@ -69,10 +69,12 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         currentUser,
       });
       toast.success(`Welcome back, ${currentUser.name}!`);
-      onSuccess();
-      onOpenChange(false);
+      setTimeout(() => {
+        onSuccess();
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
+      toast.error(error instanceof Error ? error.message : "Login failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -103,10 +105,12 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
         currentUser,
       });
       toast.success(`Account created! Welcome, ${currentUser.name}!`);
-      onSuccess();
-      onOpenChange(false);
+      setTimeout(() => {
+        onSuccess();
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Sign up failed');
+      toast.error(error instanceof Error ? error.message : "Sign up failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -316,6 +320,10 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
             </form>
 
             <form onSubmit={handlePasswordReset} className="space-y-3 border rounded-md p-4">
+          </TabsContent>
+
+          <TabsContent value="signup">
+            <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-token">Reset Token (from link)</Label>
                 <Input
@@ -360,8 +368,12 @@ export function AuthModal({ open, onOpenChange, onSuccess }: AuthModalProps) {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isResettingPassword}>
-                Reset Password
+              <p className="text-xs text-muted-foreground">
+                Sign up creates your account in the backend with city location
+                set to San Diego.
+              </p>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                Create Account
               </Button>
             </form>
           </div>

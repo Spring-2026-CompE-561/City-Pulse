@@ -20,11 +20,13 @@ export function Feed() {
   const router = useRouter();
   const [user, setUser] = useState<UserRead | null>(null);
   const [events, setEvents] = useState<FeedEvent[]>([]);
-  const [categories, setCategories] = useState<string[]>(['All Categories']);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCity, setSelectedCity] = useState('San Diego, CA');
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
-  const [startDate, setStartDate] = useState('');
+  const [categories, setCategories] = useState<string[]>(["All Categories"]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("San Diego, CA");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [selectedNeighborhood, setSelectedNeighborhood] =
+    useState("All Neighborhoods");
+  const [startDate, setStartDate] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -42,6 +44,17 @@ export function Feed() {
     return parsed.toISOString();
   }
 
+  const neighborhoods = [
+    "All Neighborhoods",
+    "Hillcrest",
+    "North Park",
+    "Gaslamp",
+    "Pacific Beach",
+    "Little Italy",
+    "Ocean Beach",
+    "Mission Beach",
+  ];
+
   useEffect(() => {
     let isMounted = true;
     const bootstrap = async () => {
@@ -50,7 +63,7 @@ export function Feed() {
         if (isMounted) {
           setLoading(false);
         }
-        router.push('/');
+        router.push("/");
         return;
       }
       setUser(sessionUser);
@@ -60,6 +73,10 @@ export function Feed() {
           getMe(),
           listEventsWithInteractions({
             category: selectedCategory,
+            neighborhood:
+              selectedNeighborhood === "All Neighborhoods"
+                ? undefined
+                : selectedNeighborhood,
             starts_after: startsAfterIsoFromDateInput(startDate),
           }),
           listTrends(),
@@ -75,17 +92,18 @@ export function Feed() {
           eventRows.map((event) => ({
             ...event,
             trending: trendingIds.has(event.id),
-          }))
+          })),
         );
         setCategories(categoryRows.options);
       } catch (error) {
         if (isAuthError(error)) {
           clearSession();
           toast.error(error.message);
-          router.push('/');
+          router.push("/");
           return;
         }
-        const message = error instanceof Error ? error.message : 'Failed to load your feed';
+        const message =
+          error instanceof Error ? error.message : "Failed to load your feed";
         setLoadError(message);
         toast.error(message);
       } finally {
@@ -102,14 +120,16 @@ export function Feed() {
 
   const handleLogout = () => {
     clearSession();
-    toast.success('Logged out successfully');
-    router.push('/');
+    toast.success("Logged out successfully");
+    router.push("/");
   };
 
   const filteredEvents = events.filter((event) => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (event.content ?? '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCity = selectedCity === 'San Diego, CA' || event.city === selectedCity;
+    const matchesSearch =
+      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (event.content ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCity =
+      selectedCity === "San Diego, CA" || event.city === selectedCity;
     return matchesSearch && matchesCity;
   });
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
@@ -154,7 +174,9 @@ export function Feed() {
       <div className="min-h-screen bg-gray-50 grid place-items-center">
         <div className="text-center space-y-4">
           <p className="text-muted-foreground">{loadError}</p>
-          <Button onClick={() => setRefreshToken((value) => value + 1)}>Retry</Button>
+          <Button onClick={() => setRefreshToken((value) => value + 1)}>
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -167,13 +189,21 @@ export function Feed() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link href="/feed" className="flex items-center gap-3">
-              <img src={logoImage.src} alt="CityPulse Logo" className="w-8 h-8" />
-              <span className="text-2xl font-bold" style={{ 
-                background: 'linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
-              }}>
+              <img
+                src={logoImage.src}
+                alt="CityPulse Logo"
+                className="w-8 h-8"
+              />
+              <span
+                className="text-2xl font-bold"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #FF6B35 0%, #004E89 50%, #E63946 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
                 CityPulse
               </span>
             </Link>
@@ -198,18 +228,21 @@ export function Feed() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">
               Welcome back, {displayName}!
             </h1>
             <p className="text-muted-foreground">
-              Discover events happening in {(user.city_location ?? 'San Diego').replace(/\b\w/g, l => l.toUpperCase())}
+              Discover events happening in{" "}
+              {(user.city_location ?? "San Diego").replace(/\b\w/g, (l) =>
+                l.toUpperCase(),
+              )}
             </p>
           </div>
-          <Button onClick={() => router.push('/create')} className="gap-2">
+          <Button onClick={() => router.push("/create")} className="gap-2">
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create Event</span>
+            <span className="sm:inline">Create Event</span>
           </Button>
         </div>
 
@@ -236,7 +269,9 @@ export function Feed() {
                 <Filter className="w-4 h-4" />
                 Filters
               </Button>
-              {(selectedCategory !== 'All Categories' || startDate) && (
+              {(selectedCategory !== "All Categories" ||
+                selectedNeighborhood !== "All Neighborhoods" ||
+                startDate) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -261,14 +296,19 @@ export function Feed() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="San Diego, CA">San Diego, CA</SelectItem>
+                      <SelectItem value="San Diego, CA">
+                        San Diego, CA
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -283,7 +323,26 @@ export function Feed() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Event Date</label>
+                  <label className="text-sm font-medium">Neighborhood</label>
+                  <Select
+                    value={selectedNeighborhood}
+                    onValueChange={setSelectedNeighborhood}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {neighborhoods.map((neighborhood) => (
+                        <SelectItem key={neighborhood} value={neighborhood}>
+                          {neighborhood}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Start Date</label>
                   <Input
                     type="date"
                     value={startDate}
@@ -315,10 +374,13 @@ export function Feed() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold">
-              {selectedCategory !== 'All Categories' ? 'Filtered Events' : 'All Events'}
+              {selectedCategory !== "All Categories"
+                ? "Filtered Events"
+                : "All Events"}
             </h2>
             <Badge variant="secondary">
-              {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'}
+              {filteredEvents.length}{" "}
+              {filteredEvents.length === 1 ? "Event" : "Events"}
             </Badge>
           </div>
 
