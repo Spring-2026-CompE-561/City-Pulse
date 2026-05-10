@@ -15,4 +15,5 @@ def test_health_endpoint_returns_ok(monkeypatch):
     assert response.json() == {
         "status": "ok",
         "service": "City Pulse API",
+        "database": "ready",
     }

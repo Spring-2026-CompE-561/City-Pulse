@@ -42,10 +42,19 @@ async def _ingestion_scheduler_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.db_ready = False
+    app.state.db_init_error = None
     if not settings.skip_db_init:
-        await init_db()
+        try:
+            await init_db()
+            app.state.db_ready = True
+        except Exception as exc:
+            app.state.db_init_error = f"{type(exc).__name__}: {exc}"
+            logger.exception("Database initialization failed")
+    else:
+        app.state.db_ready = True
     scheduler_task: asyncio.Task | None = None
-    if settings.ingest_scheduler_enabled:
+    if settings.ingest_scheduler_enabled and app.state.db_ready:
         scheduler_task = asyncio.create_task(_ingestion_scheduler_loop())
     yield
     if scheduler_task is not None:
