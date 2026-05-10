@@ -17,12 +17,29 @@ Called by / import relationships
 """
 
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROOT_ENV_FILE = PROJECT_ROOT / ".env"
+
+# Aiven copies often include ?ssl-mode=REQUIRED; SQLAlchemy passes unknown keys to
+# asyncmy.connect(), which raises TypeError for ssl-mode (not a valid kwarg).
+_DROP_DB_URL_QUERY_KEYS = frozenset({"ssl-mode", "ssl_mode", "sslmode"})
+
+
+def _sanitize_mysql_database_url(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    pairs = [
+        (k, v)
+        for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+        if k.lower() not in _DROP_DB_URL_QUERY_KEYS
+    ]
+    return urlunparse(parsed._replace(query=urlencode(pairs)))
 
 
 class Settings(BaseSettings):
@@ -124,6 +141,8 @@ class Settings(BaseSettings):
                 f"@{self.mysql_host}:{self.mysql_port}/"
                 f"{self.mysql_database}?charset=utf8mb4"
             )
+        assert self.database_url is not None
+        self.database_url = _sanitize_mysql_database_url(self.database_url)
         if self.jwt_secret_key is None or self.jwt_secret_key == "":
             raise ValueError(
                 "Missing JWT configuration. Set JWT_SECRET_KEY in the environment."
