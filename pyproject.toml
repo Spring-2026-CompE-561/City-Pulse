@@ -62,3 +62,7 @@ addopts = "--cov=app --cov-report=term-missing --cov-fail-under=50"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src"]
+
+# Vercel FastAPI: primary discovery is api/index.py; vercel_app.py is an alternate shim.
+[tool.vercel]
+entrypoint = "vercel_app:app"

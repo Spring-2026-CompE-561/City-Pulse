@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pip install -r requirements-vercel.txt",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "excludeFiles": "{frontend/**,Frontend_Draft/**,.cursor-backups/**,docker/**,**/node_modules/**,src/test/**,postman/**,.venv/**,src/media/**,**/*.pyc,__pycache__/**}"
+    }
+  }
+}
