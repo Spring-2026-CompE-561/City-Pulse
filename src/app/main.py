@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -17,8 +18,14 @@ from app.database import async_session_maker, init_db
 from app.ingestion.service import run_ingestion
 
 logger = logging.getLogger("app.request")
-MEDIA_ROOT = Path(__file__).resolve().parents[1] / "media"
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+# Vercel/AWS Lambda file systems are read-only outside /tmp; mkdir under the bundle fails at import.
+_media_candidate = Path(__file__).resolve().parents[1] / "media"
+try:
+    _media_candidate.mkdir(parents=True, exist_ok=True)
+    MEDIA_ROOT = _media_candidate
+except OSError:
+    MEDIA_ROOT = Path(os.environ.get("TMPDIR", "/tmp")) / "citypulse-media"
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 async def _ingestion_scheduler_loop() -> None:
