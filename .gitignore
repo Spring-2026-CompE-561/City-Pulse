@@ -7,6 +7,7 @@ __pycache__/
 !.env.docker.example
 *.env
 *.txt
+!requirements-vercel.txt
 *.db
 *.db-*
 *.sqlite
