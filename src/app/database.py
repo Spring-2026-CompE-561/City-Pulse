@@ -16,12 +16,14 @@ Called by / import relationships
 """
 
 from collections.abc import AsyncGenerator
+import os
 from pathlib import Path
 import re
 import ssl
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
 
 from app.config import settings
@@ -55,14 +57,15 @@ if settings.skip_db_init:
     async_session_maker = None
 else:
     _ca = _mysql_connect_args()
-    engine = create_async_engine(
-        _database_url,
-        echo=settings.debug,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
-        connect_args=_ca,
-    )
+    # Vercel serverless: pooled connections across frozen lambdas break; use NullPool.
+    _pool_kw: dict = {"echo": settings.debug, "connect_args": _ca}
+    if os.environ.get("VERCEL"):
+        _pool_kw["poolclass"] = NullPool
+    else:
+        _pool_kw["pool_pre_ping"] = True
+        _pool_kw["pool_size"] = 10
+        _pool_kw["max_overflow"] = 20
+    engine = create_async_engine(_database_url, **_pool_kw)
 
     # Session factory used by `get_db()` to create an `AsyncSession` per request.
     async_session_maker = async_sessionmaker(
