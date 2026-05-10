@@ -18,6 +18,7 @@ Called by / import relationships
 from collections.abc import AsyncGenerator
 from pathlib import Path
 import re
+import ssl
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker, create_async_engine
@@ -32,18 +33,35 @@ from app.region_map import REGION_SAN_DIEGO_ID
 # Used by: `create_async_engine(...)` below.
 _database_url: str = settings.database_url or ""
 
+
+def _mysql_connect_args() -> dict:
+    """TLS for managed MySQL (e.g. Aiven ssl-mode=REQUIRED)."""
+    if settings.skip_db_init:
+        return {}
+    pem = (settings.database_ssl_ca or "").strip()
+    if pem:
+        ctx = ssl.create_default_context()
+        ctx.load_verify_locations(cadata=pem)
+        return {"ssl": ctx}
+    if settings.database_ssl:
+        return {"ssl": ssl.create_default_context()}
+    return {}
+
+
 # The global async engine shared across the app process.
 # Used by: `async_sessionmaker(...)` to create request sessions.
 if settings.skip_db_init:
     engine = None
     async_session_maker = None
 else:
+    _ca = _mysql_connect_args()
     engine = create_async_engine(
         _database_url,
         echo=settings.debug,
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
+        connect_args=_ca,
     )
 
     # Session factory used by `get_db()` to create an `AsyncSession` per request.

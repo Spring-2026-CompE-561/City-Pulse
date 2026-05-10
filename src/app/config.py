@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     mysql_user: str | None = None
     mysql_password: str | None = None
     mysql_database: str | None = None
+    # Aiven / managed MySQL often requires TLS. Set DATABASE_SSL=true and optionally
+    # DATABASE_SSL_CA to the full PEM text from the provider ("Show CA certificate").
+    database_ssl: bool = False
+    database_ssl_ca: str | None = None
 
     # Token lifetimes (used by `app.auth` when minting tokens).
     access_token_expire_minutes: int = 60
